@@ -123,11 +123,16 @@ export async function run(): Promise<void> {
     screenshots = await captureScreenshots(config, { browsers });
 
     if (screenshots.length === 0) {
-      // ALWAYS fail if no screenshots were captured, regardless of fail-on-error setting
       const errorMessage = 'No screenshots were captured. Check your configuration and logs above.';
       logger.error(`❌ ${errorMessage}`);
-      core.setFailed(errorMessage);
-      process.exit(1); // Ensure we exit immediately
+      
+      if (failOnError) {
+        core.setFailed(errorMessage);
+        process.exit(1);
+      } else {
+        logger.warn('⚠️  Continuing despite no screenshots (fail-on-error is false)');
+        return; // Exit early but don't fail
+      }
     }
 
     logger.success(`✅ Captured ${screenshots.length} screenshots`);
@@ -167,12 +172,8 @@ export async function run(): Promise<void> {
       logger.info('   The URL should be reachable before running this action');
     }
 
-    // Check if it's a capture error with 0 screenshots
-    if (errorMessage.includes('No screenshots were captured')) {
-      // Always fail for 0 screenshots
-      core.setFailed(errorMessage);
-      process.exit(1);
-    } else if (core.getInput('fail-on-error') === 'true') {
+    // Handle errors based on fail-on-error setting
+    if (core.getInput('fail-on-error') === 'true') {
       core.setFailed(errorMessage);
       process.exit(1);
     } else {
