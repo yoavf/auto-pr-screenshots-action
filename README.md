@@ -2,14 +2,16 @@
 
 Automatically capture and post screenshots of your web app to pull requests. Perfect for visual regression testing, UI/UX reviews, and keeping stakeholders in the loop.
 
+<img width="872" height="596" alt="Screenshot 2025-08-02 at 16 27 43" src="https://github.com/user-attachments/assets/2623c02d-5ef8-4626-b71e-1e82bd4cb7f7" />
+
+
 ## Features
 
-- 🌐 **URL-based** - Simply provide your app's URL 
+- ⚡ **Simple setup** - no complex configuration needed
 - 📸 **Multi-viewport** screenshots (desktop & mobile)
 - 🌐 **Multi-browser** support (Chromium, Firefox, WebKit)
 - 💬 **Smart PR comments** that update with each push
 - 🗂️ **Organized storage** in a dedicated branch
-- ⚡ **Simple setup** - no complex configuration needed
 
 ## Quick Start
 
