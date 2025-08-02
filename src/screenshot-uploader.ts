@@ -146,7 +146,23 @@ ${screenshots.map((s) => `- ${s.name} (${s.browser})`).join('\n')}
       sha: readmeBlob.sha,
     });
 
-    // Create tree with all blobs
+    // Create latest pointer file
+    const latestPath = `pr-${prNumber}/latest`;
+    const latestContent = timestamp;
+
+    const { data: latestBlob } = await octokit.rest.git.createBlob({
+      owner,
+      repo,
+      content: Buffer.from(latestContent).toString('base64'),
+      encoding: 'base64',
+    });
+
+    blobs.push({
+      path: latestPath,
+      sha: latestBlob.sha,
+    });
+
+    // Create tree with all blobs (including latest pointer)
     const { data: tree } = await octokit.rest.git.createTree({
       owner,
       repo,
@@ -159,7 +175,7 @@ ${screenshots.map((s) => `- ${s.name} (${s.browser})`).join('\n')}
       })),
     });
 
-    // Create commit
+    // Create single commit with everything
     const { data: commit } = await octokit.rest.git.createCommit({
       owner,
       repo,
@@ -168,57 +184,13 @@ ${screenshots.map((s) => `- ${s.name} (${s.browser})`).join('\n')}
       parents: [baseSha],
     });
 
-    // Update branch reference
+    // Update branch reference once
     await octokit.rest.git.updateRef({
       owner,
       repo,
       ref: `heads/${branch}`,
       sha: commit.sha,
     });
-
-    // Create/update latest symlink
-    try {
-      const latestPath = `pr-${prNumber}/latest`;
-      const latestContent = timestamp;
-
-      const { data: latestBlob } = await octokit.rest.git.createBlob({
-        owner,
-        repo,
-        content: Buffer.from(latestContent).toString('base64'),
-        encoding: 'base64',
-      });
-
-      const { data: latestTree } = await octokit.rest.git.createTree({
-        owner,
-        repo,
-        base_tree: commit.tree.sha,
-        tree: [
-          {
-            path: latestPath,
-            mode: '100644',
-            type: 'blob',
-            sha: latestBlob.sha,
-          },
-        ],
-      });
-
-      const { data: latestCommit } = await octokit.rest.git.createCommit({
-        owner,
-        repo,
-        message: `Update latest pointer for PR #${prNumber}`,
-        tree: latestTree.sha,
-        parents: [commit.sha],
-      });
-
-      await octokit.rest.git.updateRef({
-        owner,
-        repo,
-        ref: `heads/${branch}`,
-        sha: latestCommit.sha,
-      });
-    } catch (error) {
-      logger.warn('Could not update latest pointer:', error);
-    }
 
     logger.success(`✅ Uploaded ${uploadedScreenshots.length} screenshots to ${branch}`);
     logger.info(`View at: https://github.com/${owner}/${repo}/tree/${branch}/${screenshotDir}`);
