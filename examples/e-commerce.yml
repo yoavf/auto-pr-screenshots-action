@@ -1,0 +1,106 @@
+# E-commerce site screenshot configuration
+# Shows product pages, cart, and checkout flow
+
+version: 1
+
+services:
+  - name: frontend
+    command: npm run dev
+    port: 3000
+    healthcheck: /
+    
+  - name: api
+    command: npm run dev:api
+    port: 4000
+    healthcheck: /api/health
+    env:
+      DATABASE_URL: sqlite:///tmp/test.db
+      STRIPE_SECRET_KEY: sk_test_example
+
+setup:
+  install_commands:
+    - npm install
+  pre_screenshot_commands:
+    - npm run db:migrate
+    - npm run db:seed:products
+
+screenshots:
+  # Product listing
+  - name: products-grid
+    url: http://localhost:3000/products
+    viewport: desktop
+    wait_for: '[data-testid="product-card"]'
+    
+  - name: products-mobile
+    url: http://localhost:3000/products
+    viewport: mobile
+    wait_for: '[data-testid="product-card"]'
+    
+  # Product detail with interactions
+  - name: product-detail
+    url: http://localhost:3000/products/example-product
+    viewport: desktop
+    wait_for: '[data-testid="add-to-cart"]'
+    
+  - name: product-gallery
+    url: http://localhost:3000/products/example-product
+    viewport: desktop
+    steps:
+      - wait_for: '[data-testid="product-image-2"]'
+      - click: '[data-testid="product-image-2"]'
+      - wait: 500
+      
+  # Shopping cart
+  - name: cart-empty
+    url: http://localhost:3000/cart
+    viewport: desktop
+    
+  - name: cart-with-items
+    url: http://localhost:3000/products/example-product
+    viewport: desktop
+    steps:
+      - wait_for: '[data-testid="add-to-cart"]'
+      - click: '[data-testid="add-to-cart"]'
+      - wait: 1000
+      - click: 'a[href="/cart"]'
+      - wait_for: '[data-testid="cart-item"]'
+      
+  # Checkout flow
+  - name: checkout-shipping
+    url: http://localhost:3000/products/example-product
+    viewport: desktop
+    steps:
+      # Add to cart
+      - wait_for: '[data-testid="add-to-cart"]'
+      - click: '[data-testid="add-to-cart"]'
+      - wait: 500
+      # Go to checkout
+      - click: '[data-testid="checkout-now"]'
+      - wait_for: 'input[name="email"]'
+      # Fill shipping info
+      - fill:
+          selector: 'input[name="email"]'
+          text: customer@example.com
+      - fill:
+          selector: 'input[name="firstName"]'
+          text: John
+      - fill:
+          selector: 'input[name="lastName"]'
+          text: Doe
+      - wait: 300
+      
+  # Mobile-specific flows
+  - name: mobile-filter
+    url: http://localhost:3000/products
+    viewport: mobile
+    steps:
+      - wait_for: '[data-testid="mobile-filter-button"]'
+      - click: '[data-testid="mobile-filter-button"]'
+      - wait_for: '[data-testid="filter-panel"]'
+      - wait: 500
+
+output:
+  branch: gh-screenshots
+  comment:
+    template: default
+    group_by: viewport

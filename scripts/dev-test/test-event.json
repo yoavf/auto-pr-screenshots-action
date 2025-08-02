@@ -1,0 +1,12 @@
+{
+  "pull_request": {
+    "number": 123,
+    "head": {
+      "ref": "feature-branch",
+      "sha": "abcd1234"
+    },
+    "base": {
+      "ref": "main"
+    }
+  }
+}

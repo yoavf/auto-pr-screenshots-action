@@ -1,0 +1,52 @@
+name: 'Auto PR Screenshots'
+description: 'Automatically capture and post screenshots of your web app to pull requests'
+author: 'Yoav Farhi'
+
+branding:
+  icon: 'camera'
+  color: 'blue'
+
+inputs:
+  url:
+    description: 'URL of the frontend to capture screenshots from'
+    required: false
+    default: ''
+  
+  config-file:
+    description: 'Path to configuration file (optional if URL is provided)'
+    required: false
+    default: '.github/screenshots.config.yml'
+  
+  browsers:
+    description: 'Playwright browsers to use (chromium, firefox, webkit)'
+    required: false
+    default: 'chromium'
+  
+  skip-comment:
+    description: 'Skip posting comment to PR'
+    required: false
+    default: 'false'
+  
+  fail-on-error:
+    description: 'Fail the action if screenshot capture fails'
+    required: false
+    default: 'true'
+  
+  branch:
+    description: 'Branch name for storing screenshots'
+    required: false
+    default: 'gh-screenshots'
+  
+  github-token:
+    description: 'GitHub token for posting comments and pushing screenshots'
+    required: false
+    default: ${{ github.token }}
+  
+  working-directory:
+    description: 'Working directory to run the action in'
+    required: false
+    default: '.'
+
+runs:
+  using: 'node24'
+  main: 'dist/index.js'

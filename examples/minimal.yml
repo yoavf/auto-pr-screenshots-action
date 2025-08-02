@@ -1,0 +1,18 @@
+# Minimal configuration example
+# The action will auto-detect most settings
+
+version: 1
+
+# Define what pages to screenshot
+screenshots:
+  - name: homepage
+    path: /
+    viewport: desktop
+    
+  - name: homepage-mobile
+    path: /
+    viewport: mobile
+    
+  - name: about
+    path: /about
+    viewport: desktop

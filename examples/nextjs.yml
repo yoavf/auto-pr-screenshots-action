@@ -1,0 +1,82 @@
+# Example configuration for Next.js apps
+# This shows a typical setup with authentication and multiple pages
+
+version: 1
+
+services:
+  - name: app
+    command: npm run dev
+    port: 3000
+    healthcheck: /
+    env:
+      # Use test database
+      DATABASE_URL: postgresql://test:test@localhost:5432/test
+      # Disable analytics in tests
+      NEXT_PUBLIC_ANALYTICS_ENABLED: false
+
+setup:
+  install_commands:
+    - npm install
+  pre_screenshot_commands:
+    # Seed test data
+    - npm run db:seed
+    # Build the app (optional, for production-like screenshots)
+    # - npm run build
+
+screenshots:
+  # Public pages
+  - name: home
+    url: http://localhost:3000
+    viewport: desktop
+    wait_for: '[data-testid="hero-section"]'
+    
+  - name: home-mobile
+    url: http://localhost:3000
+    viewport: mobile
+    wait_for: '[data-testid="hero-section"]'
+    
+  - name: pricing
+    url: http://localhost:3000/pricing
+    viewport: desktop
+    wait_for: '[data-testid="pricing-table"]'
+    
+  # Authenticated pages
+  - name: dashboard
+    url: http://localhost:3000/dashboard
+    viewport: desktop
+    steps:
+      # Login flow
+      - wait_for: 'input[name="email"]'
+      - fill:
+          selector: 'input[name="email"]'
+          text: test@example.com
+      - fill:
+          selector: 'input[name="password"]'
+          text: testpassword123
+      - click: 'button[type="submit"]'
+      - wait_for: '[data-testid="dashboard-content"]'
+      
+  # Interactive features
+  - name: modal-dialog
+    url: http://localhost:3000/features
+    viewport: desktop
+    steps:
+      - wait_for: '[data-testid="open-demo"]'
+      - click: '[data-testid="open-demo"]'
+      - wait_for: '[role="dialog"]'
+      - wait: 500  # Wait for animation
+      
+  # Dark mode
+  - name: dark-mode
+    url: http://localhost:3000
+    viewport: desktop
+    steps:
+      - wait_for: '[data-testid="theme-toggle"]'
+      - click: '[data-testid="theme-toggle"]'
+      - wait: 300  # Wait for theme transition
+
+output:
+  branch: gh-screenshots
+  comment:
+    template: default
+    group_by: viewport
