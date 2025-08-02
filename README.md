@@ -152,7 +152,7 @@ Available step types:
     npx wait-on http://localhost:3000
 
 - name: Take screenshots
-  uses: yoavfarhi/auto-pr-screenshots@v1
+  uses: yoavf/auto-pr-screenshots-action@v1
   with:
     url: http://localhost:3000
 ```
@@ -167,7 +167,7 @@ Available step types:
   run: npx wait-on http://localhost:8080
 
 - name: Take screenshots
-  uses: yoavfarhi/auto-pr-screenshots@v1
+  uses: yoavf/auto-pr-screenshots-action@v1
   with:
     url: http://localhost:8080
 ```
