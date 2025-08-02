@@ -8,7 +8,7 @@
    pnpm install
    ```
 
-2. Build the action (optional, for testing compiled version):
+2. Build the action:
    ```bash
    pnpm build
    ```
@@ -35,11 +35,29 @@ pnpm test:local /path/to/your/project
 ### Customize the test:
 
 Edit `test-local.ts` to:
+- Change URL: `process.env.INPUT_URL = 'http://localhost:8080'`
 - Change browsers: `process.env.INPUT_BROWSERS = 'chromium,firefox'`
 - Use a config file: `process.env.INPUT_CONFIG_FILE = 'my-config.yml'`
 - Test upload (needs real GitHub token): `process.env.INPUT_SKIP_COMMENT = 'false'`
 
-## Method 2: Test with a Real Project
+## Method 2: Test with a URL
+
+The simplest way to test - just provide a URL:
+
+```bash
+# Start your app first
+cd your-project
+npm run dev &
+
+# Wait for it to be ready
+npx wait-on http://localhost:3000
+
+# Run the action
+cd /path/to/auto-pr-screenshots
+pnpm test:local /path/to/your/project
+```
+
+## Method 3: Test with Custom Config
 
 1. **Create a test config** in your project:
 
@@ -52,45 +70,53 @@ Edit `test-local.ts` to:
    ```yaml
    version: 1
    screenshots:
-     - name: test-home
+     - name: home-large
        url: http://localhost:3000
-       viewport: desktop
+       viewport:
+         width: 1920
+         height: 1080
+       wait_for: '[data-testid="hero-section"]'
+       
+     - name: mobile-home
+       url: http://localhost:3000
+       viewport:
+         width: 390
+         height: 844
+         deviceScaleFactor: 3
+       
+     - name: form-interaction
+       url: http://localhost:3000/contact
+       viewport:
+         width: 1440
+         height: 900
+       steps:
+         - click: 'button[data-testid="open-form"]'
+         - wait: 500
+         - fill:
+             selector: 'input[name="email"]'
+             text: 'test@example.com'
+         - wait_for: '[data-testid="form-ready"]'
    ```
 
 2. **Run the test**:
    ```bash
-   cd /path/to/auto-pr-screenshots
    pnpm test:local /path/to/your/project
    ```
 
-## Method 3: Using act (GitHub Actions Emulator)
+## Method 4: Test Framework Auto-Detection
 
-Install [act](https://github.com/nektos/act):
-```bash
-brew install act  # macOS
-# or
-curl https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
-```
+To test the fallback framework detection:
 
-Run the test workflow:
 ```bash
+# Go to a Next.js, Vite, or other supported framework project
+cd /path/to/nextjs-project
+
+# Run without URL or config - should detect framework
 cd /path/to/auto-pr-screenshots
-act pull_request -W test-workflow.yml
+pnpm test:local /path/to/nextjs-project
 ```
 
-## Method 4: Test in a Real Repository
-
-1. **Fork/create a test repository**
-2. **Copy the action files**:
-   ```bash
-   cp -r /path/to/auto-pr-screenshots/.github/workflows/test-workflow.yml your-repo/.github/workflows/
-   ```
-
-3. **Create a PR in your test repo**
-4. **Use the local action**:
-   ```yaml
-   - uses: ./path/to/auto-pr-screenshots
-   ```
+Note: Framework detection assumes your app runs on default ports (e.g., 3000 for Next.js).
 
 ## Debugging Tips
 
@@ -100,62 +126,53 @@ act pull_request -W test-workflow.yml
    export DEBUG=screenshots:*
    ```
 
-2. **Check framework detection**:
+2. **Test different browsers**:
    ```bash
-   # Just test framework detection
-   cd your-project
-   node -e "require('/path/to/auto-pr-screenshots/dist/index.js')"
+   export INPUT_BROWSERS='chromium,firefox,webkit'
+   pnpm test:local /path/to/your/project
    ```
 
-3. **Test without services**:
-   Create a minimal config that doesn't start services:
-   ```yaml
-   version: 1
-   services: []  # No services
-   screenshots:
-     - name: test
-       url: https://example.com
-       viewport: desktop
+3. **Test error handling**:
+   ```bash
+   # Test with wrong URL
+   export INPUT_URL='http://localhost:9999'
+   export INPUT_FAIL_ON_ERROR='false'
+   pnpm test:local /path/to/your/project
    ```
 
 ## Common Issues
 
-### Port already in use
-- Stop any running dev servers
-- Or change the port in your config
-
-### Screenshots not capturing
-- Check the `wait_for` selectors
-- Increase wait times
-- Use `RUNNER_DEBUG=1` for detailed logs
-
-### Framework not detected
-- Check package.json has the framework dependency
-- Use a config file to override detection
-
-### Missing environment variables
-- The action will clearly report missing env vars in the logs
-- Set required variables before running:
+### App not ready
+- Make sure your app is running before starting the action
+- Use `wait-on` to ensure the app is ready:
   ```bash
-  export NEXT_PUBLIC_API_URL="http://localhost:3001"
-  pnpm test:local ../your-project
+  npx wait-on http://localhost:3000 --timeout 60000
   ```
-- Or create a test script (see test-todo-house.sh for example)
 
-### Process hangs after error
-- Fixed in latest version - processes are properly cleaned up
-- If still hanging, use Ctrl+C to exit
+### Screenshots are blank
+- Add a `wait_for` selector to ensure the page is loaded
+- Increase wait times in your config
+- Check if your app requires authentication
+
+### Wrong viewport
+- Specify exact viewport dimensions in config
+- Use `deviceScaleFactor` for high-DPI screenshots
+
+### Interactions not working
+- Verify selectors are correct
+- Add wait times between steps
+- Use `wait_for` after interactions
 
 ## Testing Checklist
 
-- [ ] Framework detection works
-- [ ] Services start correctly
-- [ ] Screenshots are captured
+- [ ] URL-based capture works
+- [ ] Config file is loaded correctly
 - [ ] Multiple viewports work
-- [ ] Browser interactions work (click, fill)
-- [ ] Error handling works (invalid config, missing selectors)
-- [ ] Debug output is helpful
-- [ ] Missing environment variables are clearly reported
-- [ ] Action fails with 0 screenshots (regardless of fail-on-error)
-- [ ] Services timeout after max 30 seconds
-- [ ] Processes are properly cleaned up on exit
+- [ ] Multiple browsers work
+- [ ] Interactions (click, fill, wait) work
+- [ ] wait_for selectors work
+- [ ] Full page screenshots work
+- [ ] Error handling with fail-on-error: false
+- [ ] Framework auto-detection (when no URL/config)
+- [ ] Custom branch names
+- [ ] Skip comment functionality

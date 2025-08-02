@@ -44,7 +44,7 @@ jobs:
       - run: npx wait-on http://localhost:3000
       
       - name: Take screenshots
-        uses: yoavfarhi/auto-pr-screenshots@v1
+        uses: yoavf/auto-pr-screenshots@v1
         with:
           url: http://localhost:3000
 ```
@@ -98,6 +98,8 @@ output:
 
 ## Action Inputs
 
+All inputs are optional. The action needs either a `url`, a `config-file`, or will fall back to framework auto-detection.
+
 | Input | Description | Default |
 |-------|-------------|---------|
 | `url` | URL of your frontend application | - |
@@ -107,6 +109,7 @@ output:
 | `fail-on-error` | Fail if screenshot capture fails | `true` |
 | `branch` | Branch for storing screenshots | `gh-screenshots` |
 | `github-token` | GitHub token | `${{ github.token }}` |
+| `working-directory` | Working directory to run the action in | `.` |
 
 ## Configuration Options
 

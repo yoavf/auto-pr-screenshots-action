@@ -17,12 +17,14 @@ process.env.GITHUB_EVENT_PATH = path.join(__dirname, 'test-event.json');
 process.env.LOCAL_TEST = 'true'; // Special flag for local testing
 
 // Set action inputs
+process.env.INPUT_URL = 'http://localhost:3000'; // Default URL, can be overridden
 process.env.INPUT_CONFIG_FILE = '.github/screenshots.config.yml';
 process.env.INPUT_BROWSERS = 'chromium';
 process.env.INPUT_SKIP_COMMENT = 'true'; // Skip PR comment for local testing
 process.env.INPUT_FAIL_ON_ERROR = 'true';
 process.env.INPUT_BRANCH = 'gh-screenshots-test';
 process.env.INPUT_GITHUB_TOKEN = process.env.GITHUB_TOKEN || 'fake-token-for-local-testing';
+process.env.INPUT_WORKING_DIRECTORY = '.';
 
 // For better debugging
 process.env.RUNNER_DEBUG = '1';
@@ -60,19 +62,17 @@ console.log('Changed to directory:', process.cwd());
 console.log('');
 
 // Import and run the action
-import('./src/index')
+// Note: We need to go back to the action directory to import
+const actionPath = path.join(__dirname, '..', '..', 'dist', 'index.js');
+import(actionPath)
   .then(({ run }) => {
-    run()
-      .then(() => {
-        console.log('\n✅ Test completed successfully');
-        process.exit(0);
-      })
-      .catch((error) => {
-        console.error('\n❌ Action failed:', error);
-        process.exit(1);
-      });
+    return run();
+  })
+  .then(() => {
+    console.log('\n✅ Test completed successfully');
+    process.exit(0);
   })
   .catch((error) => {
-    console.error('Failed to import action:', error);
+    console.error('\n❌ Action failed:', error);
     process.exit(1);
   });
