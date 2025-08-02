@@ -6,7 +6,7 @@ interface CommentOptions {
   token: string;
   context: typeof github.context;
   config: Config;
-  showAttribution?: boolean;
+  showAttribution: boolean;
 }
 
 const COMMENT_MARKER = '<!-- auto-pr-screenshots -->';
