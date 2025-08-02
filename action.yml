@@ -39,13 +39,17 @@ inputs:
   
   github-token:
     description: 'GitHub token for posting comments and pushing screenshots'
-    required: false
-    default: ${{ github.token }}
+    required: true
   
   working-directory:
     description: 'Working directory to run the action in'
     required: false
     default: '.'
+  
+  show-attribution:
+    description: 'Show attribution link in PR comments'
+    required: false
+    default: 'false'
 
 runs:
   using: 'node24'
