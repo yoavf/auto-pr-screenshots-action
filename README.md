@@ -47,6 +47,7 @@ jobs:
         uses: yoavf/auto-pr-screenshots@v1
         with:
           url: http://localhost:3000
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ### With Custom Configuration
@@ -98,18 +99,21 @@ output:
 
 ## Action Inputs
 
-All inputs are optional. The action needs either a `url`, a `config-file`, or will fall back to framework auto-detection.
+The action needs either a `url`, a `config-file`, or will fall back to framework auto-detection.
 
-| Input | Description | Default |
-|-------|-------------|---------|
-| `url` | URL of your frontend application | - |
-| `config-file` | Path to config file | `.github/screenshots.config.yml` |
-| `browsers` | Browsers to use (chromium, firefox, webkit) | `chromium` |
-| `skip-comment` | Skip posting comment to PR | `false` |
-| `fail-on-error` | Fail if screenshot capture fails | `true` |
-| `branch` | Branch for storing screenshots | `gh-screenshots` |
-| `github-token` | GitHub token | `${{ github.token }}` |
-| `working-directory` | Working directory to run the action in | `.` |
+| Input | Description | Default | Required |
+|-------|-------------|---------|----------|
+| `github-token` | GitHub token for posting comments and pushing screenshots | - | **Yes** |
+| `url` | URL of your frontend application | - | No* |
+| `config-file` | Path to config file | `.github/screenshots.config.yml` | No* |
+| `browsers` | Browsers to use (chromium, firefox, webkit) | `chromium` | No |
+| `skip-comment` | Skip posting comment to PR | `false` | No |
+| `fail-on-error` | Fail if screenshot capture fails | `true` | No |
+| `branch` | Branch for storing screenshots | `gh-screenshots` | No |
+| `working-directory` | Working directory to run the action in | `.` | No |
+| `show-attribution` | Show attribution link in PR comments | `false` | No |
+
+*\* At least one of `url`, `config-file`, or auto-detection must work for the action to run.*
 
 ## Configuration Options
 
@@ -155,6 +159,7 @@ Available step types:
   uses: yoavf/auto-pr-screenshots-action@v1
   with:
     url: http://localhost:3000
+    github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ### Docker Compose Setup
@@ -170,6 +175,7 @@ Available step types:
   uses: yoavf/auto-pr-screenshots-action@v1
   with:
     url: http://localhost:8080
+    github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ### Multiple Pages

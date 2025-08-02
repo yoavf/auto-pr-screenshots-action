@@ -40,6 +40,7 @@ export async function run(): Promise<void> {
     const branch = core.getInput('branch');
     const token = core.getInput('github-token');
     const workingDirectory = core.getInput('working-directory');
+    const showAttribution = core.getInput('show-attribution') === 'true';
 
     // Change to working directory if specified
     if (workingDirectory && workingDirectory !== '.') {
@@ -152,6 +153,7 @@ export async function run(): Promise<void> {
         token,
         context,
         config,
+        showAttribution,
       });
       logger.success('✅ Comment posted successfully');
     }
