@@ -1,6 +1,11 @@
 # Changelog
 
+## 1.0.3
+
+- Fix config file being ignored when URL input is also provided - #7
+
 ## 1.0.2
+
 - Make attribution link opt-in
 - Clarify docs
 
