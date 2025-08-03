@@ -26,6 +26,44 @@ process.on('SIGTERM', () => {
   process.exit(143);
 });
 
+/**
+ * Check if Playwright is available and browsers are installed
+ */
+async function isPlaywrightAvailable(): Promise<boolean> {
+  try {
+    // First check if playwright command is available
+    await exec.exec('playwright', ['--version'], {
+      silent: true,
+      ignoreReturnCode: false,
+    });
+
+    // If playwright is available, check if browsers are installed
+    // We'll try to run a simple check to see if browsers are available
+    let browsersAvailable = false;
+    await exec.exec('playwright', ['list'], {
+      silent: true,
+      ignoreReturnCode: true,
+      listeners: {
+        stdout: (data: Buffer) => {
+          const output = data.toString();
+          // If we see browser entries, browsers are available
+          if (
+            output.includes('chromium') ||
+            output.includes('firefox') ||
+            output.includes('webkit')
+          ) {
+            browsersAvailable = true;
+          }
+        },
+      },
+    });
+
+    return browsersAvailable;
+  } catch (_error) {
+    return false;
+  }
+}
+
 export async function run(): Promise<void> {
   const startTime = Date.now();
   logger.info('🚀 Auto PR Screenshots starting...');
@@ -41,6 +79,7 @@ export async function run(): Promise<void> {
     const token = core.getInput('github-token');
     const workingDirectory = core.getInput('working-directory');
     const showAttribution = core.getInput('show-attribution') === 'true';
+    const skipPlaywrightInstall = core.getInput('skip-playwright-install') === 'true';
 
     // Change to working directory if specified
     if (workingDirectory && workingDirectory !== '.') {
@@ -57,6 +96,7 @@ export async function run(): Promise<void> {
       branch,
       failOnError,
       workingDirectory,
+      skipPlaywrightInstall,
     });
 
     // Load configuration with proper precedence
@@ -68,26 +108,35 @@ export async function run(): Promise<void> {
     });
 
     // Install Playwright browsers if needed
-    if (!process.env.LOCAL_TEST && process.env.GITHUB_ACTIONS) {
-      logger.info('🎭 Installing Playwright browsers...');
-      try {
-        const browsersToInstall = browsers || 'chromium';
-        // First, install playwright globally to ensure CLI is available
-        await exec.exec('npm', ['install', '-g', 'playwright']);
+    if (!process.env.LOCAL_TEST && process.env.GITHUB_ACTIONS && !skipPlaywrightInstall) {
+      logger.info('🔍 Checking if Playwright is already available...');
+      const playwrightAvailable = await isPlaywrightAvailable();
 
-        // Then install the browsers
-        await exec.exec('playwright', [
-          'install',
-          '--with-deps',
-          ...browsersToInstall.split(',').map((b) => b.trim()),
-        ]);
-        logger.success('✅ Playwright browsers installed');
-      } catch (error) {
-        logger.error('Failed to install Playwright browsers:', error);
-        throw new Error(
-          'Failed to install Playwright browsers. This is required for screenshot capture.',
-        );
+      if (playwrightAvailable) {
+        logger.success('✅ Playwright is already available, skipping installation');
+      } else {
+        logger.info('🎭 Installing Playwright browsers...');
+        try {
+          const browsersToInstall = browsers || 'chromium';
+          // First, install playwright globally to ensure CLI is available
+          await exec.exec('npm', ['install', '-g', 'playwright']);
+
+          // Then install the browsers
+          await exec.exec('playwright', [
+            'install',
+            '--with-deps',
+            ...browsersToInstall.split(',').map((b) => b.trim()),
+          ]);
+          logger.success('✅ Playwright browsers installed');
+        } catch (error) {
+          logger.error('Failed to install Playwright browsers:', error);
+          throw new Error(
+            'Failed to install Playwright browsers. This is required for screenshot capture.',
+          );
+        }
       }
+    } else if (skipPlaywrightInstall) {
+      logger.info('⏭️  Skipping Playwright installation (skip-playwright-install=true)');
     }
 
     // Validate we're in a PR context

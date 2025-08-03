@@ -114,6 +114,7 @@ The action needs either a `url`, a `config-file`, or will fall back to framework
 | `branch` | Branch for storing screenshots | `gh-screenshots` | No |
 | `working-directory` | Working directory to run the action in | `.` | No |
 | `show-attribution` | Show attribution link in PR comments | `false` | No |
+| `skip-playwright-install` | Skip Playwright installation (useful when Playwright is already set up) | `false` | No |
 
 *\* At least one of `url`, `config-file`, or auto-detection must work for the action to run.*
 
@@ -257,6 +258,28 @@ steps:
   - click: 'button[type="submit"]'
   - wait_for: '[data-testid="user-dashboard"]'
 ```
+
+## Performance & Optimization
+
+### Playwright Installation
+
+By default, this action automatically installs Playwright browsers when running in GitHub Actions. However, if Playwright is already available in your environment (e.g., installed as part of your project setup or cached), the action will automatically detect this and skip the installation step.
+
+You can also explicitly skip Playwright installation using the `skip-playwright-install` input:
+
+```yaml
+- name: Take screenshots
+  uses: yoavf/auto-pr-screenshots@v1
+  with:
+    url: http://localhost:3000
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    skip-playwright-install: true  # Skip installation if you manage Playwright yourself
+```
+
+This is useful for:
+- Faster workflow execution when Playwright is already cached
+- Custom Playwright setups or configurations
+- Environments where Playwright installation is handled separately
 
 ## License
 
