@@ -271,7 +271,7 @@ function applyActionOverrides(
     logger.info(`🔄 Overriding screenshot URLs with: ${overrides.url}`);
     result.screenshots = result.screenshots.map((screenshot) => ({
       ...screenshot,
-      url: overrides.url!,
+      url: overrides.url,
     }));
   }
 
