@@ -268,10 +268,11 @@ function applyActionOverrides(
 
   // Override URLs if provided
   if (overrides.url) {
-    logger.info(`🔄 Overriding screenshot URLs with: ${overrides.url}`);
+    const overrideUrl = overrides.url;
+    logger.info(`🔄 Overriding screenshot URLs with: ${overrideUrl}`);
     result.screenshots = result.screenshots.map((screenshot) => ({
       ...screenshot,
-      url: overrides.url,
+      url: overrideUrl,
     }));
   }
 
