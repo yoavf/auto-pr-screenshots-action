@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+          
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        
+      - name: Run linter and formatter check
+        run: pnpm lint
+        
+      - name: Run type check
+        run: pnpm check
+        
+      - name: Run tests
+        run: pnpm test
+        
+      - name: Build
+        run: pnpm build
+        
+      - name: Verify dist is up to date
+        run: |
+          if [ -n "$(git status --porcelain dist/)" ]; then
+            echo "::error::Generated dist files are out of date. Run 'pnpm build' and commit the changes."
+            git diff dist/
+            exit 1
+          fi

@@ -43,10 +43,10 @@ screenshots:
       expect(config.screenshots).toHaveLength(2);
       expect(config.screenshots[0].name).toBe('home');
       expect(config.screenshots[0].viewport).toEqual({ width: 1440, height: 900 });
-      expect(config.screenshots[1].viewport).toEqual({ 
-        width: 390, 
-        height: 844, 
-        deviceScaleFactor: 3 
+      expect(config.screenshots[1].viewport).toEqual({
+        width: 390,
+        height: 844,
+        deviceScaleFactor: 3,
       });
     });
 
@@ -61,7 +61,9 @@ screenshots:
     it('should throw generic error for other failures', async () => {
       (fs.readFile as jest.Mock).mockRejectedValue(new Error('Permission denied'));
 
-      await expect(loadConfig('config.yml')).rejects.toThrow('Failed to load config: Permission denied');
+      await expect(loadConfig('config.yml')).rejects.toThrow(
+        'Failed to load config: Permission denied',
+      );
     });
   });
 
@@ -69,9 +71,7 @@ screenshots:
     it('should validate correct config', () => {
       const config = {
         version: 1,
-        screenshots: [
-          { name: 'test', url: 'http://localhost' },
-        ],
+        screenshots: [{ name: 'test', url: 'http://localhost' }],
       };
 
       expect(() => validateConfig(config)).not.toThrow();
@@ -84,8 +84,9 @@ screenshots:
     });
 
     it('should throw if no screenshots provided', () => {
-      expect(() => validateConfig({ version: 1, screenshots: [] }))
-        .toThrow('Config must include at least one screenshot');
+      expect(() => validateConfig({ version: 1, screenshots: [] })).toThrow(
+        'Config must include at least one screenshot',
+      );
     });
 
     it('should throw if screenshot missing name', () => {
@@ -99,7 +100,9 @@ screenshots:
       const config = {
         screenshots: [{ name: 'test' }],
       };
-      expect(() => validateConfig(config)).toThrow('Screenshot "test" must have either url or path');
+      expect(() => validateConfig(config)).toThrow(
+        'Screenshot "test" must have either url or path',
+      );
     });
 
     it('should accept path instead of url', () => {
@@ -119,10 +122,10 @@ screenshots:
       expect(normalizeViewport('desktop')).toEqual({ width: 1440, height: 900 });
       expect(normalizeViewport('laptop')).toEqual({ width: 1366, height: 768 });
       expect(normalizeViewport('tablet')).toEqual({ width: 768, height: 1024 });
-      expect(normalizeViewport('mobile')).toEqual({ 
-        width: 390, 
-        height: 844, 
-        deviceScaleFactor: 3 
+      expect(normalizeViewport('mobile')).toEqual({
+        width: 390,
+        height: 844,
+        deviceScaleFactor: 3,
       });
     });
 
@@ -132,17 +135,14 @@ screenshots:
     });
 
     it('should throw for unknown preset', () => {
-      expect(() => normalizeViewport('unknown'))
-        .toThrow('Unknown viewport preset: unknown');
+      expect(() => normalizeViewport('unknown')).toThrow('Unknown viewport preset: unknown');
     });
   });
 
   describe('normalizeConfig', () => {
     it('should normalize config with defaults', () => {
       const raw = {
-        screenshots: [
-          { name: 'test', url: 'http://localhost' },
-        ],
+        screenshots: [{ name: 'test', url: 'http://localhost' }],
       };
 
       const normalized = normalizeConfig(raw as any);
@@ -159,9 +159,7 @@ screenshots:
 
     it('should convert path to localhost URL', () => {
       const raw = {
-        screenshots: [
-          { name: 'test', path: '/about' },
-        ],
+        screenshots: [{ name: 'test', path: '/about' }],
       };
 
       const normalized = normalizeConfig(raw as any);
@@ -170,9 +168,7 @@ screenshots:
 
     it('should handle wait_for alias', () => {
       const raw = {
-        screenshots: [
-          { name: 'test', url: 'http://localhost', wait_for: '.loaded' },
-        ],
+        screenshots: [{ name: 'test', url: 'http://localhost', wait_for: '.loaded' }],
       };
 
       const normalized = normalizeConfig(raw as any);
