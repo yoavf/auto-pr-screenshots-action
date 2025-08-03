@@ -210,7 +210,8 @@ function generateScreenshotGrid(
     }
 
     // Fill empty cells if needed
-    const emptyCells = columns - (screenshots.length - i);
+    const screenshotsInRow = Math.min(columns, screenshots.length - i);
+    const emptyCells = columns - screenshotsInRow;
     if (emptyCells > 0 && emptyCells < columns) {
       for (let k = 0; k < emptyCells; k++) {
         grid += '<td></td>\n';
