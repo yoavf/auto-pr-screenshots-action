@@ -51,7 +51,7 @@ screenshots:
     });
 
     it('should throw specific error when file not found', async () => {
-      const error = new Error('ENOENT') as any;
+      const error = new Error('ENOENT') as NodeJS.ErrnoException;
       error.code = 'ENOENT';
       (fs.readFile as jest.Mock).mockRejectedValue(error);
 
