@@ -1,6 +1,5 @@
 import { promises as fs } from 'node:fs';
 import { loadConfig, normalizeConfig, normalizeViewport, validateConfig } from '../config-loader';
-import type { Config } from '../types';
 
 jest.mock('node:fs', () => ({
   promises: {
@@ -145,7 +144,7 @@ screenshots:
         screenshots: [{ name: 'test', url: 'http://localhost' }],
       };
 
-      const normalized = normalizeConfig(raw as any);
+      const normalized = normalizeConfig(raw);
 
       expect(normalized.version).toBe(1);
       expect(normalized.output).toEqual({
@@ -162,7 +161,7 @@ screenshots:
         screenshots: [{ name: 'test', path: '/about' }],
       };
 
-      const normalized = normalizeConfig(raw as any);
+      const normalized = normalizeConfig(raw);
       expect(normalized.screenshots[0].url).toBe('http://localhost:3000/about');
     });
 
@@ -171,7 +170,7 @@ screenshots:
         screenshots: [{ name: 'test', url: 'http://localhost', wait_for: '.loaded' }],
       };
 
-      const normalized = normalizeConfig(raw as any);
+      const normalized = normalizeConfig(raw);
       expect(normalized.screenshots[0].waitFor).toBe('.loaded');
     });
   });
