@@ -1,5 +1,11 @@
 import { promises as fs } from 'node:fs';
-import { loadConfig, normalizeConfig, normalizeViewport, validateConfig } from '../config-loader';
+import {
+  loadConfig,
+  normalizeConfig,
+  normalizeViewport,
+  type RawConfig,
+  validateConfig,
+} from '../config-loader';
 
 jest.mock('node:fs', () => ({
   promises: {
@@ -140,7 +146,7 @@ screenshots:
 
   describe('normalizeConfig', () => {
     it('should normalize config with defaults', () => {
-      const raw = {
+      const raw: RawConfig = {
         screenshots: [{ name: 'test', url: 'http://localhost' }],
       };
 
@@ -157,7 +163,7 @@ screenshots:
     });
 
     it('should convert path to localhost URL', () => {
-      const raw = {
+      const raw: RawConfig = {
         screenshots: [{ name: 'test', path: '/about' }],
       };
 
@@ -166,7 +172,7 @@ screenshots:
     });
 
     it('should handle wait_for alias', () => {
-      const raw = {
+      const raw: RawConfig = {
         screenshots: [{ name: 'test', url: 'http://localhost', wait_for: '.loaded' }],
       };
 
