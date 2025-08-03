@@ -59,35 +59,13 @@ export async function run(): Promise<void> {
       workingDirectory,
     });
 
-    let config: Config;
-
-    // If URL is provided, create a simple config
-    if (url) {
-      logger.info(`🌐 Using provided URL: ${url}`);
-      config = createSimpleConfig(url);
-    }
-    // Otherwise, try loading config file
-    else if (configFile && (await fileExists(configFile))) {
-      logger.info(`📄 Loading config from: ${configFile}`);
-      config = await loadConfig(configFile);
-    }
-    // As a fallback, try to detect framework
-    else {
-      logger.info('🔍 No URL or config file provided, attempting framework detection...');
-      const framework = await detectFramework();
-      if (framework) {
-        logger.success(`✅ Detected framework: ${framework.name}`);
-        config = framework.config;
-      } else {
-        throw new Error(
-          'No URL provided and could not detect framework automatically.\n' +
-            'Please either:\n' +
-            '1. Provide a URL using the "url" input\n' +
-            '2. Create a config file at .github/screenshots.config.yml\n' +
-            '3. Ensure your project uses a supported framework for auto-detection',
-        );
-      }
-    }
+    // Load configuration with proper precedence
+    const config = await loadConfiguration({
+      url,
+      configFile,
+      branch,
+      failOnError,
+    });
 
     // Install Playwright browsers if needed
     if (!process.env.LOCAL_TEST && process.env.GITHUB_ACTIONS) {
@@ -126,7 +104,7 @@ export async function run(): Promise<void> {
     if (screenshots.length === 0) {
       const errorMessage = 'No screenshots were captured. Check your configuration and logs above.';
       logger.error(`❌ ${errorMessage}`);
-      
+
       if (failOnError) {
         core.setFailed(errorMessage);
         process.exit(1);
@@ -223,6 +201,89 @@ async function fileExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function loadConfiguration(options: {
+  url?: string;
+  configFile?: string;
+  branch?: string;
+  failOnError: boolean;
+}): Promise<Config> {
+  const { url, configFile, branch, failOnError } = options;
+
+  // Step 1: Try to load config file
+  const configPath = configFile || '.github/screenshots.config.yml';
+  let baseConfig: Config | null = null;
+
+  if (await fileExists(configPath)) {
+    try {
+      logger.info(`📄 Loading config from: ${configPath}`);
+      baseConfig = await loadConfig(configPath);
+    } catch (error) {
+      logger.error(`Failed to load config file: ${error}`);
+      if (failOnError) throw error;
+    }
+  }
+
+  // Step 2: If no config file, try alternatives
+  if (!baseConfig) {
+    if (url) {
+      logger.info(`🌐 Using provided URL: ${url}`);
+      baseConfig = createSimpleConfig(url);
+    } else {
+      logger.info('🔍 Attempting framework detection...');
+      const framework = await detectFramework();
+      if (framework) {
+        logger.success(`✅ Detected framework: ${framework.name}`);
+        baseConfig = framework.config;
+      }
+    }
+  }
+
+  // Step 3: Validate we have a config
+  if (!baseConfig) {
+    throw new Error(
+      'No configuration available.\n' +
+        'Please either:\n' +
+        '1. Provide a URL using the "url" input\n' +
+        '2. Create a config file at .github/screenshots.config.yml\n' +
+        '3. Ensure your project uses a supported framework for auto-detection',
+    );
+  }
+
+  // Step 4: Apply overrides from action inputs
+  const finalConfig = applyActionOverrides(baseConfig, { url, branch });
+
+  return finalConfig;
+}
+
+function applyActionOverrides(
+  config: Config,
+  overrides: {
+    url?: string;
+    branch?: string;
+  },
+): Config {
+  const result = { ...config };
+
+  // Override URLs if provided
+  if (overrides.url) {
+    logger.info(`🔄 Overriding screenshot URLs with: ${overrides.url}`);
+    result.screenshots = result.screenshots.map((screenshot) => ({
+      ...screenshot,
+      url: overrides.url!,
+    }));
+  }
+
+  // Override branch if provided
+  if (overrides.branch) {
+    result.output = {
+      ...result.output,
+      branch: overrides.branch,
+    };
+  }
+
+  return result;
 }
 
 // Run the action
