@@ -50,7 +50,6 @@ inputs:
     description: 'Show attribution link in PR comments'
     required: false
     default: 'false'
-  
   skip-playwright-install:
     description: 'Skip Playwright installation (useful when Playwright is already set up)'
     required: false
