@@ -1,17 +1,17 @@
 # Auto PR Screenshots 📸
 
-Automatically capture and post screenshots of your web app to pull requests. Perfect for visual regression testing, UI/UX reviews, and keeping stakeholders in the loop.
+Automatically capture and post screenshots of your web app to pull requests.
+Perfect for visual regression testing, UI/UX reviews, and keeping tabs of AI generated PRs.
 
-<img width="872" height="596" alt="Screenshot 2025-08-02 at 16 27 43" src="https://github.com/user-attachments/assets/2623c02d-5ef8-4626-b71e-1e82bd4cb7f7" />
-
+<img width="767" height="778" alt="Screen showing comment posted by the Auto PR Screenshots GitHub action" src="https://github.com/user-attachments/assets/ab76177d-648a-452d-b548-29a893c1fd54" />
 
 ## Features
 
 - ⚡ **Simple setup** - no complex configuration needed
-- 📸 **Multi-viewport** screenshots (desktop & mobile)
-- 🌐 **Multi-browser** support (Chromium, Firefox, WebKit)
 - 💬 **Smart PR comments** that update with each push
 - 🗂️ **Organized storage** in a dedicated branch
+- 📸 **Multi-viewport** screenshots (desktop & mobile)
+- 🌐 **Multi-browser** support (Chromium, Firefox, WebKit)
 
 ## Quick Start
 
@@ -27,8 +27,8 @@ jobs:
   screenshots:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
+      contents: write      # Required for pushing screenshots
+      pull-requests: write # Required for posting comments
     
     steps:
       - uses: actions/checkout@v4
@@ -51,6 +51,15 @@ jobs:
           url: http://localhost:3000
           github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+## Required Permissions
+
+This action requires specific permissions to function properly:
+
+- **`contents: write`** - Required to create and push to the screenshots branch
+- **`pull-requests: write`** - Required to post comments on pull requests
+
+**Important:** You must always provide the `github-token` input, even when permissions are set. The token is required for authentication, while permissions define what the token can do.
 
 ### With Custom Configuration
 
@@ -221,7 +230,7 @@ If no URL or config is provided, the action will attempt to detect and use commo
 
 ## Troubleshooting
 
-### Screenshots are blank or show loading state
+#### Screenshots are blank or show loading state
 
 Add a `wait_for` selector to ensure the page is fully loaded:
 
@@ -232,7 +241,7 @@ screenshots:
     wait_for: '[data-testid="content-loaded"]'
 ```
 
-### App takes time to start
+#### App takes time to start
 
 Use `wait-on` or similar tools:
 
@@ -241,7 +250,7 @@ npm run dev &
 npx wait-on http://localhost:3000 --timeout 60000
 ```
 
-### Need to test authenticated pages
+#### Need to test authenticated pages
 
 Use the `steps` array to interact with your app:
 
@@ -256,6 +265,13 @@ steps:
       text: testpass
   - click: 'button[type="submit"]'
   - wait_for: '[data-testid="user-dashboard"]'
+```
+
+#### Permission Errors
+
+If you see the error:
+```
+Error: Resource not accessible by integration
 ```
 
 ## License
