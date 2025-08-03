@@ -69,7 +69,7 @@ export async function postComment(
   }
 }
 
-export function generateCommentBody(
+function generateCommentBody(
   screenshots: UploadedScreenshot[],
   context: typeof github.context,
   config: Config,
