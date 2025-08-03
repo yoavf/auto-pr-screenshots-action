@@ -170,41 +170,41 @@ function generateScreenshotGrid(
       }
 
       // Add playwright actions if they exist
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+      function escapeHtml(text: string): string {
+        return text
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
 
-// Add playwright actions if they exist
-if (screenshotConfig?.steps && screenshotConfig.steps.length > 0) {
-  grid += '<br>\n';
-  grid += '<details>\n';
-  grid += '<summary><sub>🎭 Actions</sub></summary>\n';
-  grid += '<div align="left">\n';
-  grid += '<br>\n';
+      // Add playwright actions if they exist
+      if (screenshotConfig?.steps && screenshotConfig.steps.length > 0) {
+        grid += '<br>\n';
+        grid += '<details>\n';
+        grid += '<summary><sub>🎭 Actions</sub></summary>\n';
+        grid += '<div align="left">\n';
+        grid += '<br>\n';
 
-  for (const step of screenshotConfig.steps) {
-    if (step.click) {
-      grid += `<code>click("${escapeHtml(step.click)}")</code><br>\n`;
-    }
-    if (step.fill) {
-      grid += `<code>fill("${escapeHtml(step.fill.selector)}", "${escapeHtml(step.fill.text)}")</code><br>\n`;
-    }
-    if (step.wait) {
-      grid += `<code>wait(${step.wait}ms)</code><br>\n`;
-    }
-    if (step.waitFor) {
-      grid += `<code>waitFor("${escapeHtml(step.waitFor)}")</code><br>\n`;
-    }
-  }
+        for (const step of screenshotConfig.steps) {
+          if (step.click) {
+            grid += `<code>click("${escapeHtml(step.click)}")</code><br>\n`;
+          }
+          if (step.fill) {
+            grid += `<code>fill("${escapeHtml(step.fill.selector)}", "${escapeHtml(step.fill.text)}")</code><br>\n`;
+          }
+          if (step.wait) {
+            grid += `<code>wait(${step.wait}ms)</code><br>\n`;
+          }
+          if (step.waitFor) {
+            grid += `<code>waitFor("${escapeHtml(step.waitFor)}")</code><br>\n`;
+          }
+        }
 
-  grid += '</div>\n';
-  grid += '</details>\n';
-}
+        grid += '</div>\n';
+        grid += '</details>\n';
+      }
 
       grid += '</td>\n';
     }
