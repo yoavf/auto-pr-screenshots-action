@@ -71,7 +71,7 @@ export function validateConfig(config: unknown): RawConfig {
   return rawConfig as RawConfig;
 }
 
-interface RawConfig {
+export interface RawConfig {
   version?: number;
   screenshots: Array<{
     name: string;

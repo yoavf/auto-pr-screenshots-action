@@ -1,6 +1,11 @@
 import { promises as fs } from 'node:fs';
-import { loadConfig, normalizeConfig, normalizeViewport, validateConfig } from '../config-loader';
-import type { Config } from '../types';
+import {
+  loadConfig,
+  normalizeConfig,
+  normalizeViewport,
+  type RawConfig,
+  validateConfig,
+} from '../config-loader';
 
 jest.mock('node:fs', () => ({
   promises: {
@@ -141,11 +146,11 @@ screenshots:
 
   describe('normalizeConfig', () => {
     it('should normalize config with defaults', () => {
-      const raw = {
+      const raw: RawConfig = {
         screenshots: [{ name: 'test', url: 'http://localhost' }],
       };
 
-      const normalized = normalizeConfig(raw as any);
+      const normalized = normalizeConfig(raw);
 
       expect(normalized.version).toBe(1);
       expect(normalized.output).toEqual({
@@ -158,20 +163,20 @@ screenshots:
     });
 
     it('should convert path to localhost URL', () => {
-      const raw = {
+      const raw: RawConfig = {
         screenshots: [{ name: 'test', path: '/about' }],
       };
 
-      const normalized = normalizeConfig(raw as any);
+      const normalized = normalizeConfig(raw);
       expect(normalized.screenshots[0].url).toBe('http://localhost:3000/about');
     });
 
     it('should handle wait_for alias', () => {
-      const raw = {
+      const raw: RawConfig = {
         screenshots: [{ name: 'test', url: 'http://localhost', wait_for: '.loaded' }],
       };
 
-      const normalized = normalizeConfig(raw as any);
+      const normalized = normalizeConfig(raw);
       expect(normalized.screenshots[0].waitFor).toBe('.loaded');
     });
   });
