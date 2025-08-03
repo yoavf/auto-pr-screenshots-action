@@ -1,0 +1,34 @@
+echo "🔍 Running pre-commit checks..."
+
+# Run lint-staged on changed files
+echo "📝 Running lint-staged..."
+if ! pnpm lint-staged; then
+  echo "❌ lint-staged failed"
+  exit 1
+fi
+
+# Run type check
+echo "🔍 Running type check..."
+if ! pnpm check; then
+  echo "❌ Type check failed"
+  exit 1
+fi
+
+# Run tests
+echo "🧪 Running tests..."
+if ! pnpm test; then
+  echo "❌ Tests failed"
+  exit 1
+fi
+
+# Build the project and add dist files
+echo "🔨 Building project..."
+if ! pnpm build; then
+  echo "❌ Build failed"
+  exit 1
+fi
+
+echo "📦 Adding dist files to commit..."
+git add dist/
+
+echo "✅ All pre-commit checks passed!"
