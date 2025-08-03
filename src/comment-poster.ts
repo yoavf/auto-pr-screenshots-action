@@ -69,7 +69,7 @@ export async function postComment(
   }
 }
 
-function generateCommentBody(
+export function generateCommentBody(
   screenshots: UploadedScreenshot[],
   context: typeof github.context,
   config: Config,
@@ -99,26 +99,26 @@ function generateCommentBody(
 
     if (desktop.length > 0) {
       body += '### 🖥️ Desktop\n\n';
-      body += generateScreenshotGrid(desktop, 2, 400);
+      body += generateScreenshotGrid(desktop, 3, 250, config);
     }
 
     if (tablet.length > 0) {
       body += '### 📱 Tablet\n\n';
-      body += generateScreenshotGrid(tablet, 3, 300);
+      body += generateScreenshotGrid(tablet, 4, 200, config);
     }
 
     if (mobile.length > 0) {
       body += '### 📱 Mobile\n\n';
-      body += generateScreenshotGrid(mobile, 4, 200);
+      body += generateScreenshotGrid(mobile, 5, 150, config);
     }
 
     if (other.length > 0) {
       body += '### 📸 Other\n\n';
-      body += generateScreenshotGrid(other, 3, 300);
+      body += generateScreenshotGrid(other, 4, 200, config);
     }
   } else {
     // Default: show all screenshots in a grid
-    body += generateScreenshotGrid(screenshots, 3, 300);
+    body += generateScreenshotGrid(screenshots, 4, 200, config);
   }
 
   // Add metadata
@@ -145,6 +145,7 @@ function generateScreenshotGrid(
   screenshots: UploadedScreenshot[],
   columns: number,
   width: number,
+  config: Config,
 ): string {
   let grid = '<table>\n';
 
@@ -155,6 +156,9 @@ function generateScreenshotGrid(
       const screenshot = screenshots[i + j];
       const name = formatScreenshotName(screenshot.name);
 
+      // Find the corresponding config for this screenshot to get steps
+      const screenshotConfig = config.screenshots.find((sc) => sc.name === screenshot.name);
+
       grid += '<td align="center">\n';
       grid += `<b>${name}</b><br>\n`;
       grid += `<a href="${screenshot.url}" target="_blank">\n`;
@@ -163,6 +167,33 @@ function generateScreenshotGrid(
 
       if (screenshot.browser !== 'chromium') {
         grid += `<br><sub>${screenshot.browser}</sub>\n`;
+      }
+
+      // Add playwright actions if they exist
+      if (screenshotConfig?.steps && screenshotConfig.steps.length > 0) {
+        grid += '<br>\n';
+        grid += '<details>\n';
+        grid += '<summary><sub>🎭 Actions</sub></summary>\n';
+        grid += '<div align="left">\n';
+        grid += '<br>\n';
+
+        for (const step of screenshotConfig.steps) {
+          if (step.click) {
+            grid += `<code>click("${step.click}")</code><br>\n`;
+          }
+          if (step.fill) {
+            grid += `<code>fill("${step.fill.selector}", "${step.fill.text}")</code><br>\n`;
+          }
+          if (step.wait) {
+            grid += `<code>wait(${step.wait}ms)</code><br>\n`;
+          }
+          if (step.waitFor) {
+            grid += `<code>waitFor("${step.waitFor}")</code><br>\n`;
+          }
+        }
+
+        grid += '</div>\n';
+        grid += '</details>\n';
       }
 
       grid += '</td>\n';
