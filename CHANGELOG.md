@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0
+
+- Improve the layout of the comment posted on the PR
+
 ## 1.0.3
 
 - Fix config file being ignored when URL input is also provided - #7
