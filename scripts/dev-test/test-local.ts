@@ -1,6 +1,5 @@
 #!/usr/bin/env tsx
 
-import * as fs from 'node:fs';
 // TypeScript test script to run the action locally
 import * as path from 'node:path';
 
@@ -28,21 +27,6 @@ process.env.INPUT_WORKING_DIRECTORY = '.';
 
 // For better debugging
 process.env.RUNNER_DEBUG = '1';
-
-// Create a fake event payload
-const eventPayload = {
-  pull_request: {
-    number: 123,
-    head: {
-      ref: 'feature-branch',
-      sha: 'abcd1234',
-    },
-    base: {
-      ref: 'main',
-    },
-  },
-};
-fs.writeFileSync('test-event.json', JSON.stringify(eventPayload, null, 2));
 
 console.log('🧪 Testing Auto PR Screenshots locally...\n');
 console.log('Environment:', {
