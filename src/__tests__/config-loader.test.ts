@@ -206,21 +206,5 @@ screenshots:
         wipTitles: false,
       });
     });
-
-    it('should handle wip_titles alias in skip configuration', () => {
-      const raw: RawConfig = {
-        screenshots: [{ name: 'test', url: 'http://localhost' }],
-        skip: {
-          label: 'skip-screenshots',
-          wip_titles: false,
-        },
-      };
-
-      const normalized = normalizeConfig(raw);
-      expect(normalized.skip).toEqual({
-        label: 'skip-screenshots',
-        wipTitles: false,
-      });
-    });
   });
 });

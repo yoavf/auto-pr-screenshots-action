@@ -10,9 +10,6 @@ skip:
   # Skip PRs with [wip] in title (case insensitive). Default: true
   # Set to false to disable WIP title skipping
   wipTitles: true
-  
-  # Alternative snake_case format also supported:
-  # wip_titles: true
 
 screenshots:
   - name: desktop-home

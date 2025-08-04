@@ -176,9 +176,6 @@ skip:
   
   # Skip PRs with [wip] in title (default: true)
   wipTitles: false  # Set to false to disable WIP skipping
-  
-  # Alternative snake_case format also supported
-  # wip_titles: false
 
 screenshots:
   # ... your screenshot configs

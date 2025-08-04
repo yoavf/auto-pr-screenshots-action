@@ -97,7 +97,6 @@ export interface RawConfig {
   skip?: {
     label?: string;
     wipTitles?: boolean;
-    wip_titles?: boolean; // Support snake_case alias
   };
   [key: string]: unknown;
 }
@@ -112,8 +111,7 @@ export function normalizeConfig(config: RawConfig): Config {
       ...DEFAULT_CONFIG.skip,
       ...(config.skip && {
         label: config.skip.label,
-        wipTitles:
-          config.skip.wipTitles ?? config.skip.wip_titles ?? DEFAULT_CONFIG.skip!.wipTitles,
+        wipTitles: config.skip.wipTitles ?? DEFAULT_CONFIG.skip!.wipTitles,
       }),
     },
   };
