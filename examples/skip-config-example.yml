@@ -1,0 +1,30 @@
+# Example configuration with skip settings
+
+version: 1
+
+# Skip settings - all optional
+skip:
+  # Label name that when present on PR will skip the action
+  label: "skip-screenshots"
+  
+  # Skip PRs with [wip] in title (case insensitive). Default: true
+  # Set to false to disable WIP title skipping
+  wipTitles: true
+  
+  # Alternative snake_case format also supported:
+  # wip_titles: true
+
+screenshots:
+  - name: desktop-home
+    url: http://localhost:3000
+    viewport: desktop
+    
+  - name: mobile-home  
+    url: http://localhost:3000
+    viewport: mobile
+
+output:
+  branch: gh-screenshots
+  comment:
+    template: default
+    group_by: viewport

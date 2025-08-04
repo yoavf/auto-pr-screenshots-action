@@ -123,6 +123,8 @@ The action needs either a `url`, a `config-file`, or will fall back to framework
 | `branch` | Branch for storing screenshots | `gh-screenshots` | No |
 | `working-directory` | Working directory to run the action in | `.` | No |
 | `show-attribution` | Show attribution link in PR comments | `false` | No |
+| `skip-label` | Label name that when present on PR will skip the action | - | No |
+| `skip-wip-titles` | Skip PRs with [wip] in title (case insensitive) | `true` | No |
 
 *\* At least one of `url`, `config-file`, or auto-detection must work for the action to run.*
 
@@ -153,6 +155,43 @@ Available step types:
   - `text`: Text to enter
 - `wait`: Wait for milliseconds
 - `wait_for`: Wait for element
+
+### Skip Configuration
+
+You can configure when to skip screenshot capture:
+
+#### Action Inputs
+
+- `skip-label`: If this label is present on the PR, screenshots will be skipped
+- `skip-wip-titles`: Skip PRs with `[wip]` in title (case insensitive). Default: `true`
+
+#### Config File
+
+```yaml
+version: 1
+
+skip:
+  # Skip if PR has this label
+  label: "skip-screenshots"
+  
+  # Skip PRs with [wip] in title (default: true)
+  wipTitles: false  # Set to false to disable WIP skipping
+  
+  # Alternative snake_case format also supported
+  # wip_titles: false
+
+screenshots:
+  # ... your screenshot configs
+```
+
+**Examples of WIP titles that are skipped by default:**
+- `[WIP] Feature implementation`
+- `[wip] Bug fix in progress` 
+- `Feature [WIP] needs review`
+
+To disable WIP title skipping, either:
+1. Set `skip-wip-titles: false` in action inputs, or
+2. Set `wipTitles: false` in your config file
 
 ## Examples
 

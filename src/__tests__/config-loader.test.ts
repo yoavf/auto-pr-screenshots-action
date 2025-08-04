@@ -179,5 +179,48 @@ screenshots:
       const normalized = normalizeConfig(raw);
       expect(normalized.screenshots[0].waitFor).toBe('.loaded');
     });
+
+    it('should normalize skip configuration with defaults', () => {
+      const raw: RawConfig = {
+        screenshots: [{ name: 'test', url: 'http://localhost' }],
+      };
+
+      const normalized = normalizeConfig(raw);
+      expect(normalized.skip).toEqual({
+        wipTitles: true,
+      });
+    });
+
+    it('should handle skip configuration from raw config', () => {
+      const raw: RawConfig = {
+        screenshots: [{ name: 'test', url: 'http://localhost' }],
+        skip: {
+          label: 'skip-screenshots',
+          wipTitles: false,
+        },
+      };
+
+      const normalized = normalizeConfig(raw);
+      expect(normalized.skip).toEqual({
+        label: 'skip-screenshots',
+        wipTitles: false,
+      });
+    });
+
+    it('should handle wip_titles alias in skip configuration', () => {
+      const raw: RawConfig = {
+        screenshots: [{ name: 'test', url: 'http://localhost' }],
+        skip: {
+          label: 'skip-screenshots',
+          wip_titles: false,
+        },
+      };
+
+      const normalized = normalizeConfig(raw);
+      expect(normalized.skip).toEqual({
+        label: 'skip-screenshots',
+        wipTitles: false,
+      });
+    });
   });
 });

@@ -51,6 +51,16 @@ inputs:
     required: false
     default: 'false'
 
+  skip-label:
+    description: 'Label name that when present on PR will skip the action'
+    required: false
+    default: ''
+
+  skip-wip-titles:
+    description: 'Skip PRs with [wip] in title (case insensitive). Set to false to disable.'
+    required: false
+    default: 'true'
+
 runs:
   using: 'node24'
   main: 'dist/index.js'
