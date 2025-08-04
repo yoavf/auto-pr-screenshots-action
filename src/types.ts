@@ -34,6 +34,10 @@ export interface Config {
       group_by: string;
     };
   };
+  skip?: {
+    label?: string;
+    wipTitles?: boolean;
+  };
 }
 
 export interface FrameworkInfo {

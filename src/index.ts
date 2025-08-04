@@ -13,6 +13,46 @@ import type { CapturedScreenshot, Config } from './types';
 // Track if we need to exit
 let _shouldExit = false;
 
+async function checkShouldSkip(
+  config: Config,
+  options: { token: string; context: typeof github.context },
+): Promise<{ skip: boolean; reason?: string }> {
+  const { token, context } = options;
+
+  // Check WIP title first (faster check)
+  if (config.skip?.wipTitles) {
+    const prTitle = context.payload.pull_request?.title;
+    if (prTitle && /\[wip\]/i.test(prTitle)) {
+      return { skip: true, reason: 'PR title contains [wip]' };
+    }
+  }
+
+  // Check skip label
+  if (config.skip?.label) {
+    try {
+      const octokit = github.getOctokit(token);
+      const { data: pullRequest } = await octokit.rest.pulls.get({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        pull_number: context.payload.pull_request?.number || 0,
+      });
+
+      const hasSkipLabel = pullRequest.labels.some(
+        (label) => (typeof label === 'string' ? label : label.name) === config.skip?.label,
+      );
+
+      if (hasSkipLabel) {
+        return { skip: true, reason: `PR has skip label: ${config.skip.label}` };
+      }
+    } catch (error) {
+      logger.warn(`⚠️  Failed to check PR labels: ${error}`);
+      // Continue without skipping if we can't check labels
+    }
+  }
+
+  return { skip: false };
+}
+
 // Handle process termination
 process.on('SIGINT', () => {
   logger.info('\nReceived SIGINT, cleaning up...');
@@ -41,6 +81,8 @@ export async function run(): Promise<void> {
     const token = core.getInput('github-token');
     const workingDirectory = core.getInput('working-directory');
     const showAttribution = core.getInput('show-attribution') === 'true';
+    const skipLabel = core.getInput('skip-label');
+    const skipWipTitles = core.getInput('skip-wip-titles') === 'true';
 
     // Change to working directory if specified
     if (workingDirectory && workingDirectory !== '.') {
@@ -65,6 +107,8 @@ export async function run(): Promise<void> {
       configFile,
       branch,
       failOnError,
+      skipLabel,
+      skipWipTitles,
     });
 
     // Install Playwright browsers if needed
@@ -94,6 +138,15 @@ export async function run(): Promise<void> {
     const context = github.context;
     if (context.eventName !== 'pull_request' && !process.env.LOCAL_TEST) {
       logger.warn('⚠️  Not running in a pull request context, some features may be limited');
+    }
+
+    // Check if we should skip based on labels or title
+    if (context.eventName === 'pull_request' && !process.env.LOCAL_TEST) {
+      const shouldSkip = await checkShouldSkip(config, { token, context });
+      if (shouldSkip.skip) {
+        logger.info(`⏭️  Skipping screenshot capture: ${shouldSkip.reason}`);
+        return;
+      }
     }
 
     // Capture screenshots
@@ -191,6 +244,9 @@ function createSimpleConfig(url: string): Config {
         group_by: 'viewport',
       },
     },
+    skip: {
+      wipTitles: true,
+    },
   };
 }
 
@@ -208,8 +264,10 @@ async function loadConfiguration(options: {
   configFile?: string;
   branch?: string;
   failOnError: boolean;
+  skipLabel?: string;
+  skipWipTitles?: boolean;
 }): Promise<Config> {
-  const { url, configFile, branch, failOnError } = options;
+  const { url, configFile, branch, failOnError, skipLabel, skipWipTitles } = options;
 
   // Step 1: Try to load config file
   const configPath = configFile || '.github/screenshots.config.yml';
@@ -252,7 +310,7 @@ async function loadConfiguration(options: {
   }
 
   // Step 4: Apply overrides from action inputs
-  const finalConfig = applyActionOverrides(baseConfig, { url, branch });
+  const finalConfig = applyActionOverrides(baseConfig, { url, branch, skipLabel, skipWipTitles });
 
   return finalConfig;
 }
@@ -262,6 +320,8 @@ function applyActionOverrides(
   overrides: {
     url?: string;
     branch?: string;
+    skipLabel?: string;
+    skipWipTitles?: boolean;
   },
 ): Config {
   const result = { ...config };
@@ -281,6 +341,15 @@ function applyActionOverrides(
     result.output = {
       ...result.output,
       branch: overrides.branch,
+    };
+  }
+
+  // Override skip settings if provided
+  if (overrides.skipLabel !== undefined || overrides.skipWipTitles !== undefined) {
+    result.skip = {
+      ...result.skip,
+      ...(overrides.skipLabel !== undefined && { label: overrides.skipLabel }),
+      ...(overrides.skipWipTitles !== undefined && { wipTitles: overrides.skipWipTitles }),
     };
   }
 

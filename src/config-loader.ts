@@ -14,6 +14,9 @@ const DEFAULT_CONFIG: Config = {
       group_by: 'viewport',
     },
   },
+  skip: {
+    wipTitles: true,
+  },
 };
 
 export async function loadConfig(configPath: string): Promise<Config> {
@@ -91,6 +94,10 @@ export interface RawConfig {
       group_by: string;
     };
   };
+  skip?: {
+    label?: string;
+    wipTitles?: boolean;
+  };
   [key: string]: unknown;
 }
 
@@ -100,6 +107,13 @@ export function normalizeConfig(config: RawConfig): Config {
     version: config.version || 1,
     screenshots: [],
     output: config.output || DEFAULT_CONFIG.output,
+    skip: {
+      ...DEFAULT_CONFIG.skip,
+      ...(config.skip && {
+        label: config.skip.label,
+        wipTitles: config.skip.wipTitles ?? DEFAULT_CONFIG.skip!.wipTitles,
+      }),
+    },
   };
 
   normalized.screenshots = config.screenshots.map((screenshot) => {
