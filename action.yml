@@ -51,6 +51,11 @@ inputs:
     required: false
     default: 'false'
 
+  cleanup-on-close:
+    description: 'Delete screenshots and comments when PR is closed'
+    required: false
+    default: 'true'
+
 runs:
   using: 'node24'
   main: 'dist/index.js'

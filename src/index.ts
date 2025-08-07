@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import * as core from '@actions/core';
 import * as exec from '@actions/exec';
 import * as github from '@actions/github';
+import { cleanupScreenshots } from './cleanup';
 import { postComment } from './comment-poster';
 import { loadConfig } from './config-loader';
 import { detectFramework } from './framework-detector';
@@ -28,7 +29,18 @@ process.on('SIGTERM', () => {
 
 export async function run(): Promise<void> {
   const startTime = Date.now();
-  logger.info('🚀 Auto PR Screenshots starting...');
+
+  // Check if this is a PR closed event
+  const context = github.context;
+  const isPRClosed =
+    context.eventName === 'pull_request' &&
+    (context.payload.action === 'closed' || context.payload.pull_request?.state === 'closed');
+
+  if (isPRClosed) {
+    logger.info('🧹 PR closed - running cleanup mode...');
+  } else {
+    logger.info('🚀 Auto PR Screenshots starting...');
+  }
 
   try {
     // Get inputs
@@ -41,6 +53,20 @@ export async function run(): Promise<void> {
     const token = core.getInput('github-token');
     const workingDirectory = core.getInput('working-directory');
     const showAttribution = core.getInput('show-attribution') === 'true';
+    const cleanupOnClose = core.getInput('cleanup-on-close') === 'true';
+
+    // Handle cleanup mode
+    if (isPRClosed && cleanupOnClose) {
+      await cleanupScreenshots({
+        token,
+        branch,
+        context,
+      });
+
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+      logger.success(`🎉 Cleanup completed in ${duration}s`);
+      return;
+    }
 
     // Change to working directory if specified
     if (workingDirectory && workingDirectory !== '.') {
@@ -91,7 +117,6 @@ export async function run(): Promise<void> {
     }
 
     // Validate we're in a PR context
-    const context = github.context;
     if (context.eventName !== 'pull_request' && !process.env.LOCAL_TEST) {
       logger.warn('⚠️  Not running in a pull request context, some features may be limited');
     }
