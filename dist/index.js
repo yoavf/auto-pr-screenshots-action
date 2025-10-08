@@ -89304,7 +89304,7 @@ exports.postComment = postComment;
 const github = __importStar(__nccwpck_require__(75380));
 const logger_1 = __nccwpck_require__(61661);
 const COMMENT_MARKER = '<!-- auto-pr-screenshots -->';
-async function postComment(screenshots, options) {
+async function postComment(screenshots, errors, options) {
     const { token, context, config } = options;
     // Only post comments on pull requests
     if (context.eventName !== 'pull_request' || !context.payload.pull_request) {
@@ -89324,7 +89324,7 @@ async function postComment(screenshots, options) {
         });
         const existingComment = comments.find((comment) => comment.body?.includes(COMMENT_MARKER) && comment.user?.type === 'Bot');
         // Generate comment body
-        const commentBody = generateCommentBody(screenshots, context, config, options.showAttribution);
+        const commentBody = generateCommentBody(screenshots, errors, context, config, options.showAttribution);
         if (existingComment) {
             // Update existing comment
             await octokit.rest.issues.updateComment({
@@ -89351,53 +89351,80 @@ async function postComment(screenshots, options) {
         throw error;
     }
 }
-function generateCommentBody(screenshots, context, config, showAttribution = false) {
+function generateCommentBody(screenshots, errors, context, config, showAttribution = false) {
     const timestamp = new Date().toISOString();
     const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
     let body = `${COMMENT_MARKER}\n`;
     body += '## 📸 Auto PR Screenshots\n\n';
     body += `*Updated: ${timestamp}*\n\n`;
-    if (screenshots.length === 0) {
+    if (screenshots.length === 0 && errors.length === 0) {
         body += `⚠️ No screenshots were captured. Check the [action logs](${runUrl}) for details.\n`;
         return body;
     }
-    // Group screenshots based on config
-    if (config.output.comment.group_by === 'viewport') {
-        const desktop = screenshots.filter((s) => s.name.includes('desktop'));
-        const mobile = screenshots.filter((s) => s.name.includes('mobile'));
-        const tablet = screenshots.filter((s) => s.name.includes('tablet'));
-        const other = screenshots.filter((s) => !s.name.includes('desktop') && !s.name.includes('mobile') && !s.name.includes('tablet'));
-        if (desktop.length > 0) {
-            body += '### 🖥️ Desktop\n\n';
-            body += generateScreenshotGrid(desktop, 3, 250, config);
+    // Show successful screenshots first
+    if (screenshots.length > 0) {
+        body += '### ✅ Successful Screenshots\n\n';
+        // Group screenshots based on config
+        if (config.output.comment.group_by === 'viewport') {
+            const desktop = screenshots.filter((s) => s.name.includes('desktop'));
+            const mobile = screenshots.filter((s) => s.name.includes('mobile'));
+            const tablet = screenshots.filter((s) => s.name.includes('tablet'));
+            const other = screenshots.filter((s) => !s.name.includes('desktop') && !s.name.includes('mobile') && !s.name.includes('tablet'));
+            if (desktop.length > 0) {
+                body += '### 🖥️ Desktop\n\n';
+                body += generateScreenshotGrid(desktop, 3, 250, config);
+            }
+            if (tablet.length > 0) {
+                body += '### 📱 Tablet\n\n';
+                body += generateScreenshotGrid(tablet, 4, 200, config);
+            }
+            if (mobile.length > 0) {
+                body += '### 📱 Mobile\n\n';
+                body += generateScreenshotGrid(mobile, 5, 150, config);
+            }
+            if (other.length > 0) {
+                body += '### 📸 Other\n\n';
+                body += generateScreenshotGrid(other, 4, 200, config);
+            }
         }
-        if (tablet.length > 0) {
-            body += '### 📱 Tablet\n\n';
-            body += generateScreenshotGrid(tablet, 4, 200, config);
-        }
-        if (mobile.length > 0) {
-            body += '### 📱 Mobile\n\n';
-            body += generateScreenshotGrid(mobile, 5, 150, config);
-        }
-        if (other.length > 0) {
-            body += '### 📸 Other\n\n';
-            body += generateScreenshotGrid(other, 4, 200, config);
+        else {
+            // Default: show all screenshots in a grid
+            body += generateScreenshotGrid(screenshots, 4, 200, config);
         }
     }
-    else {
-        // Default: show all screenshots in a grid
-        body += generateScreenshotGrid(screenshots, 4, 200, config);
+    // Show errors after successful screenshots
+    if (errors.length > 0) {
+        body += '### ❌ Failed Screenshots\n\n';
+        body += 'The following screenshots could not be captured:\n\n';
+        for (const error of errors) {
+            const name = formatScreenshotName(error.name);
+            // Clean up error message: remove "Call log:" prefix and format nicely
+            let errorMsg = error.error;
+            let logDetails = '';
+            if (errorMsg.includes('Call log:')) {
+                // Extract just the timeout message before "Call log:"
+                const parts = errorMsg.split('Call log:');
+                errorMsg = parts[0].trim();
+                // Extract bullet points if they exist
+                if (parts[1]) {
+                    const logLines = parts[1]
+                        .trim()
+                        .split('\n')
+                        .filter((line) => line.trim().startsWith('-'))
+                        .map((line) => line.trim().substring(2).trim()); // Remove "- " prefix
+                    if (logLines.length > 0) {
+                        logDetails = logLines.map((line) => `\`${line}\``).join('<br>');
+                    }
+                }
+            }
+            body += `${name} (${error.browser}): ${errorMsg}`;
+            if (logDetails) {
+                body += `<br>${logDetails}`;
+            }
+            body += '\n\n';
+        }
+        body += `Check the [action logs](${runUrl}) for more details.\n\n`;
     }
-    // Add metadata
-    body += '\n---\n';
-    body += '<details>\n<summary>📋 Screenshot Details</summary>\n\n';
-    body += '| Name | Browser | Link |\n';
-    body += '|------|---------|------|\n';
-    for (const screenshot of screenshots) {
-        const name = formatScreenshotName(screenshot.name);
-        body += `| ${name} | ${screenshot.browser} | [View](${screenshot.url}) |\n`;
-    }
-    body += '\n</details>\n\n';
     if (showAttribution) {
         body += `*Generated by [Auto PR Screenshots](https://github.com/yoavf/auto-pr-screenshots-action) • [View Run](${runUrl})*`;
     }
@@ -89414,12 +89441,10 @@ function generateScreenshotGrid(screenshots, columns, width, config) {
             const screenshotConfig = config.screenshots.find((sc) => sc.name === screenshot.name);
             grid += '<td align="center">\n';
             grid += `<b>${name}</b><br>\n`;
+            grid += `<sub>${screenshot.browser}</sub><br>\n`;
             grid += `<a href="${screenshot.url}" target="_blank">\n`;
             grid += `<img src="${screenshot.url}" alt="${name}" width="${width}">\n`;
             grid += '</a>\n';
-            if (screenshot.browser !== 'chromium') {
-                grid += `<br><sub>${screenshot.browser}</sub>\n`;
-            }
             // Add playwright actions if they exist
             function escapeHtml(text) {
                 return text
@@ -89454,14 +89479,6 @@ function generateScreenshotGrid(screenshots, columns, width, config) {
                 grid += '</details>\n';
             }
             grid += '</td>\n';
-        }
-        // Fill empty cells if needed
-        const screenshotsInRow = Math.min(columns, screenshots.length - i);
-        const emptyCells = columns - screenshotsInRow;
-        if (emptyCells > 0 && emptyCells < columns) {
-            for (let k = 0; k < emptyCells; k++) {
-                grid += '<td></td>\n';
-            }
         }
         grid += '</tr>\n';
     }
@@ -89989,8 +90006,12 @@ async function run() {
         }
         // Capture screenshots
         logger_1.logger.info('📸 Capturing screenshots...');
-        let screenshots = [];
-        screenshots = await (0, screenshot_capture_1.captureScreenshots)(config, { browsers });
+        const captureResult = await (0, screenshot_capture_1.captureScreenshots)(config, { browsers });
+        const screenshots = captureResult.successful;
+        const screenshotErrors = captureResult.failed;
+        if (screenshotErrors.length > 0) {
+            logger_1.logger.warn(`⚠️  ${screenshotErrors.length} screenshot(s) failed to capture`);
+        }
         if (screenshots.length === 0) {
             const errorMessage = 'No screenshots were captured. Check your configuration and logs above.';
             logger_1.logger.error(`❌ ${errorMessage}`);
@@ -90000,10 +90021,21 @@ async function run() {
             }
             else {
                 logger_1.logger.warn('⚠️  Continuing despite no screenshots (fail-on-error is false)');
+                // Post comment with just errors if we're in a PR context
+                if (!skipComment && context.eventName === 'pull_request') {
+                    logger_1.logger.info('💬 Posting error comment to PR...');
+                    await (0, comment_poster_1.postComment)([], screenshotErrors, {
+                        token,
+                        context,
+                        config,
+                        showAttribution,
+                    });
+                    logger_1.logger.success('✅ Error comment posted');
+                }
                 return; // Exit early but don't fail
             }
         }
-        logger_1.logger.success(`✅ Captured ${screenshots.length} screenshots`);
+        logger_1.logger.success(`✅ Captured ${screenshots.length} screenshot(s)`);
         // Upload to branch
         logger_1.logger.info(`📤 Uploading screenshots to branch: ${branch}`);
         const uploadedUrls = await (0, screenshot_uploader_1.uploadScreenshots)(screenshots, {
@@ -90014,7 +90046,7 @@ async function run() {
         // Post comment to PR
         if (!skipComment && context.eventName === 'pull_request') {
             logger_1.logger.info('💬 Posting comment to PR...');
-            await (0, comment_poster_1.postComment)(uploadedUrls, {
+            await (0, comment_poster_1.postComment)(uploadedUrls, screenshotErrors, {
                 token,
                 context,
                 config,
@@ -90357,7 +90389,8 @@ async function captureScreenshots(config, options = {}) {
     logger_1.captureLogger.info(`Starting screenshot capture with browsers: ${browserList.join(', ')}`);
     const screenshotsDir = path.join(process.cwd(), 'screenshots');
     await node_fs_1.promises.mkdir(screenshotsDir, { recursive: true });
-    const screenshots = [];
+    const successful = [];
+    const failed = [];
     for (const browserName of browserList) {
         if (!BROWSER_MAP[browserName]) {
             logger_1.captureLogger.warn(`Unknown browser: ${browserName}, skipping`);
@@ -90369,9 +90402,12 @@ async function captureScreenshots(config, options = {}) {
         });
         try {
             for (const screenshotConfig of config.screenshots) {
-                const screenshot = await captureScreenshot(browser, screenshotConfig, browserName);
-                if (screenshot) {
-                    screenshots.push(screenshot);
+                const result = await captureScreenshot(browser, screenshotConfig, browserName);
+                if (result.success) {
+                    successful.push(result.screenshot);
+                }
+                else {
+                    failed.push(result.error);
                 }
             }
         }
@@ -90379,7 +90415,7 @@ async function captureScreenshots(config, options = {}) {
             await browser.close();
         }
     }
-    return screenshots;
+    return { successful, failed };
 }
 async function captureScreenshot(browser, config, browserName) {
     const filename = `${config.name}-${browserName}.png`;
@@ -90427,14 +90463,25 @@ async function captureScreenshot(browser, config, browserName) {
         await context.close();
         logger_1.captureLogger.success(`✅ Captured ${filename}`);
         return {
-            name: config.name,
-            browser: browserName,
-            path: filepath,
+            success: true,
+            screenshot: {
+                name: config.name,
+                browser: browserName,
+                path: filepath,
+            },
         };
     }
     catch (error) {
-        logger_1.captureLogger.error(`Failed to capture ${config.name} (${browserName}):`, error instanceof Error ? error.message : String(error));
-        return null;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger_1.captureLogger.error(`Failed to capture ${config.name} (${browserName}):`, errorMessage);
+        return {
+            success: false,
+            error: {
+                name: config.name,
+                browser: browserName,
+                error: errorMessage,
+            },
+        };
     }
 }
 async function executeSteps(page, steps) {
@@ -90455,7 +90502,7 @@ async function executeSteps(page, steps) {
         }
         if (step.waitFor) {
             logger_1.captureLogger.debug(`Waiting for selector: ${step.waitFor}`);
-            await page.waitForSelector(step.waitFor, { state: 'visible' });
+            await page.waitForSelector(step.waitFor, { state: 'visible', timeout: 10000 });
         }
     }
 }

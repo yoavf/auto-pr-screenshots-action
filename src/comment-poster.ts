@@ -1,6 +1,6 @@
 import * as github from '@actions/github';
 import { commentLogger as logger } from './logger';
-import type { Config, UploadedScreenshot } from './types';
+import type { Config, ScreenshotError, UploadedScreenshot } from './types';
 
 interface CommentOptions {
   token: string;
@@ -13,6 +13,7 @@ const COMMENT_MARKER = '<!-- auto-pr-screenshots -->';
 
 export async function postComment(
   screenshots: UploadedScreenshot[],
+  errors: ScreenshotError[],
   options: CommentOptions,
 ): Promise<void> {
   const { token, context, config } = options;
@@ -42,7 +43,13 @@ export async function postComment(
     );
 
     // Generate comment body
-    const commentBody = generateCommentBody(screenshots, context, config, options.showAttribution);
+    const commentBody = generateCommentBody(
+      screenshots,
+      errors,
+      context,
+      config,
+      options.showAttribution,
+    );
 
     if (existingComment) {
       // Update existing comment
@@ -71,6 +78,7 @@ export async function postComment(
 
 function generateCommentBody(
   screenshots: UploadedScreenshot[],
+  errors: ScreenshotError[],
   context: typeof github.context,
   config: Config,
   showAttribution: boolean = false,
@@ -82,57 +90,87 @@ function generateCommentBody(
   body += '## 📸 Auto PR Screenshots\n\n';
   body += `*Updated: ${timestamp}*\n\n`;
 
-  if (screenshots.length === 0) {
+  if (screenshots.length === 0 && errors.length === 0) {
     body += `⚠️ No screenshots were captured. Check the [action logs](${runUrl}) for details.\n`;
     return body;
   }
 
-  // Group screenshots based on config
-  if (config.output.comment.group_by === 'viewport') {
-    const desktop = screenshots.filter((s) => s.name.includes('desktop'));
-    const mobile = screenshots.filter((s) => s.name.includes('mobile'));
-    const tablet = screenshots.filter((s) => s.name.includes('tablet'));
-    const other = screenshots.filter(
-      (s) =>
-        !s.name.includes('desktop') && !s.name.includes('mobile') && !s.name.includes('tablet'),
-    );
+  // Show successful screenshots first
+  if (screenshots.length > 0) {
+    body += '### ✅ Successful Screenshots\n\n';
 
-    if (desktop.length > 0) {
-      body += '### 🖥️ Desktop\n\n';
-      body += generateScreenshotGrid(desktop, 3, 250, config);
-    }
+    // Group screenshots based on config
+    if (config.output.comment.group_by === 'viewport') {
+      const desktop = screenshots.filter((s) => s.name.includes('desktop'));
+      const mobile = screenshots.filter((s) => s.name.includes('mobile'));
+      const tablet = screenshots.filter((s) => s.name.includes('tablet'));
+      const other = screenshots.filter(
+        (s) =>
+          !s.name.includes('desktop') && !s.name.includes('mobile') && !s.name.includes('tablet'),
+      );
 
-    if (tablet.length > 0) {
-      body += '### 📱 Tablet\n\n';
-      body += generateScreenshotGrid(tablet, 4, 200, config);
-    }
+      if (desktop.length > 0) {
+        body += '### 🖥️ Desktop\n\n';
+        body += generateScreenshotGrid(desktop, 3, 250, config);
+      }
 
-    if (mobile.length > 0) {
-      body += '### 📱 Mobile\n\n';
-      body += generateScreenshotGrid(mobile, 5, 150, config);
-    }
+      if (tablet.length > 0) {
+        body += '### 📱 Tablet\n\n';
+        body += generateScreenshotGrid(tablet, 4, 200, config);
+      }
 
-    if (other.length > 0) {
-      body += '### 📸 Other\n\n';
-      body += generateScreenshotGrid(other, 4, 200, config);
+      if (mobile.length > 0) {
+        body += '### 📱 Mobile\n\n';
+        body += generateScreenshotGrid(mobile, 5, 150, config);
+      }
+
+      if (other.length > 0) {
+        body += '### 📸 Other\n\n';
+        body += generateScreenshotGrid(other, 4, 200, config);
+      }
+    } else {
+      // Default: show all screenshots in a grid
+      body += generateScreenshotGrid(screenshots, 4, 200, config);
     }
-  } else {
-    // Default: show all screenshots in a grid
-    body += generateScreenshotGrid(screenshots, 4, 200, config);
   }
 
-  // Add metadata
-  body += '\n---\n';
-  body += '<details>\n<summary>📋 Screenshot Details</summary>\n\n';
-  body += '| Name | Browser | Link |\n';
-  body += '|------|---------|------|\n';
+  // Show errors after successful screenshots
+  if (errors.length > 0) {
+    body += '### ❌ Failed Screenshots\n\n';
+    body += 'The following screenshots could not be captured:\n\n';
 
-  for (const screenshot of screenshots) {
-    const name = formatScreenshotName(screenshot.name);
-    body += `| ${name} | ${screenshot.browser} | [View](${screenshot.url}) |\n`;
+    for (const error of errors) {
+      const name = formatScreenshotName(error.name);
+      // Clean up error message: remove "Call log:" prefix and format nicely
+      let errorMsg = error.error;
+      let logDetails = '';
+
+      if (errorMsg.includes('Call log:')) {
+        // Extract just the timeout message before "Call log:"
+        const parts = errorMsg.split('Call log:');
+        errorMsg = parts[0].trim();
+        // Extract bullet points if they exist
+        if (parts[1]) {
+          const logLines = parts[1]
+            .trim()
+            .split('\n')
+            .filter((line) => line.trim().startsWith('-'))
+            .map((line) => line.trim().substring(2).trim()); // Remove "- " prefix
+          if (logLines.length > 0) {
+            logDetails = logLines.map((line) => `\`${line}\``).join('<br>');
+          }
+        }
+      }
+
+      body += `${name} (${error.browser}): ${errorMsg}`;
+      if (logDetails) {
+        body += `<br>${logDetails}`;
+      }
+      body += '\n\n';
+    }
+
+    body += `Check the [action logs](${runUrl}) for more details.\n\n`;
   }
-
-  body += '\n</details>\n\n';
 
   if (showAttribution) {
     body += `*Generated by [Auto PR Screenshots](https://github.com/yoavf/auto-pr-screenshots-action) • [View Run](${runUrl})*`;
@@ -161,13 +199,10 @@ function generateScreenshotGrid(
 
       grid += '<td align="center">\n';
       grid += `<b>${name}</b><br>\n`;
+      grid += `<sub>${screenshot.browser}</sub><br>\n`;
       grid += `<a href="${screenshot.url}" target="_blank">\n`;
       grid += `<img src="${screenshot.url}" alt="${name}" width="${width}">\n`;
       grid += '</a>\n';
-
-      if (screenshot.browser !== 'chromium') {
-        grid += `<br><sub>${screenshot.browser}</sub>\n`;
-      }
 
       // Add playwright actions if they exist
       function escapeHtml(text: string): string {
@@ -207,15 +242,6 @@ function generateScreenshotGrid(
       }
 
       grid += '</td>\n';
-    }
-
-    // Fill empty cells if needed
-    const screenshotsInRow = Math.min(columns, screenshots.length - i);
-    const emptyCells = columns - screenshotsInRow;
-    if (emptyCells > 0 && emptyCells < columns) {
-      for (let k = 0; k < emptyCells; k++) {
-        grid += '<td></td>\n';
-      }
     }
 
     grid += '</tr>\n';

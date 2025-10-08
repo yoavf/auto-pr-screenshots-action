@@ -2,7 +2,13 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { type Browser, chromium, firefox, type Page, webkit } from 'playwright';
 import { captureLogger } from './logger';
-import type { CapturedScreenshot, Config, ScreenshotConfig } from './types';
+import type {
+  CapturedScreenshot,
+  CaptureResult,
+  Config,
+  ScreenshotConfig,
+  ScreenshotError,
+} from './types';
 
 const BROWSER_MAP = {
   chromium,
@@ -19,7 +25,7 @@ interface CaptureOptions {
 export async function captureScreenshots(
   config: Config,
   options: CaptureOptions = {},
-): Promise<CapturedScreenshot[]> {
+): Promise<CaptureResult> {
   const { browsers = 'chromium' } = options;
   const browserList = browsers.split(',').map((b) => b.trim()) as BrowserName[];
 
@@ -28,7 +34,8 @@ export async function captureScreenshots(
   const screenshotsDir = path.join(process.cwd(), 'screenshots');
   await fs.mkdir(screenshotsDir, { recursive: true });
 
-  const screenshots: CapturedScreenshot[] = [];
+  const successful: CapturedScreenshot[] = [];
+  const failed: ScreenshotError[] = [];
 
   for (const browserName of browserList) {
     if (!BROWSER_MAP[browserName]) {
@@ -43,9 +50,11 @@ export async function captureScreenshots(
 
     try {
       for (const screenshotConfig of config.screenshots) {
-        const screenshot = await captureScreenshot(browser, screenshotConfig, browserName);
-        if (screenshot) {
-          screenshots.push(screenshot);
+        const result = await captureScreenshot(browser, screenshotConfig, browserName);
+        if (result.success) {
+          successful.push(result.screenshot);
+        } else {
+          failed.push(result.error);
         }
       }
     } finally {
@@ -53,14 +62,16 @@ export async function captureScreenshots(
     }
   }
 
-  return screenshots;
+  return { successful, failed };
 }
 
 async function captureScreenshot(
   browser: Browser,
   config: ScreenshotConfig,
   browserName: string,
-): Promise<CapturedScreenshot | null> {
+): Promise<
+  { success: true; screenshot: CapturedScreenshot } | { success: false; error: ScreenshotError }
+> {
   const filename = `${config.name}-${browserName}.png`;
   const filepath = path.join(process.cwd(), 'screenshots', filename);
 
@@ -116,16 +127,24 @@ async function captureScreenshot(
 
     captureLogger.success(`✅ Captured ${filename}`);
     return {
-      name: config.name,
-      browser: browserName,
-      path: filepath,
+      success: true,
+      screenshot: {
+        name: config.name,
+        browser: browserName,
+        path: filepath,
+      },
     };
   } catch (error) {
-    captureLogger.error(
-      `Failed to capture ${config.name} (${browserName}):`,
-      error instanceof Error ? error.message : String(error),
-    );
-    return null;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    captureLogger.error(`Failed to capture ${config.name} (${browserName}):`, errorMessage);
+    return {
+      success: false,
+      error: {
+        name: config.name,
+        browser: browserName,
+        error: errorMessage,
+      },
+    };
   }
 }
 
@@ -150,7 +169,7 @@ async function executeSteps(page: Page, steps: ScreenshotConfig['steps']): Promi
 
     if (step.waitFor) {
       captureLogger.debug(`Waiting for selector: ${step.waitFor}`);
-      await page.waitForSelector(step.waitFor, { state: 'visible' });
+      await page.waitForSelector(step.waitFor, { state: 'visible', timeout: 10000 });
     }
   }
 }
