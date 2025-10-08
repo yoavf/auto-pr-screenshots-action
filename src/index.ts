@@ -8,7 +8,7 @@ import { detectFramework } from './framework-detector';
 import { logger } from './logger';
 import { captureScreenshots } from './screenshot-capture';
 import { uploadScreenshots } from './screenshot-uploader';
-import type { CapturedScreenshot, Config } from './types';
+import type { Config } from './types';
 
 // Track if we need to exit
 let _shouldExit = false;
@@ -98,8 +98,13 @@ export async function run(): Promise<void> {
 
     // Capture screenshots
     logger.info('📸 Capturing screenshots...');
-    let screenshots: CapturedScreenshot[] = [];
-    screenshots = await captureScreenshots(config, { browsers });
+    const captureResult = await captureScreenshots(config, { browsers });
+    const screenshots = captureResult.successful;
+    const screenshotErrors = captureResult.failed;
+
+    if (screenshotErrors.length > 0) {
+      logger.warn(`⚠️  ${screenshotErrors.length} screenshot(s) failed to capture`);
+    }
 
     if (screenshots.length === 0) {
       const errorMessage = 'No screenshots were captured. Check your configuration and logs above.';
@@ -110,11 +115,22 @@ export async function run(): Promise<void> {
         process.exit(1);
       } else {
         logger.warn('⚠️  Continuing despite no screenshots (fail-on-error is false)');
+        // Post comment with just errors if we're in a PR context
+        if (!skipComment && context.eventName === 'pull_request') {
+          logger.info('💬 Posting error comment to PR...');
+          await postComment([], screenshotErrors, {
+            token,
+            context,
+            config,
+            showAttribution,
+          });
+          logger.success('✅ Error comment posted');
+        }
         return; // Exit early but don't fail
       }
     }
 
-    logger.success(`✅ Captured ${screenshots.length} screenshots`);
+    logger.success(`✅ Captured ${screenshots.length} screenshot(s)`);
 
     // Upload to branch
     logger.info(`📤 Uploading screenshots to branch: ${branch}`);
@@ -127,7 +143,7 @@ export async function run(): Promise<void> {
     // Post comment to PR
     if (!skipComment && context.eventName === 'pull_request') {
       logger.info('💬 Posting comment to PR...');
-      await postComment(uploadedUrls, {
+      await postComment(uploadedUrls, screenshotErrors, {
         token,
         context,
         config,

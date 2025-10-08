@@ -53,3 +53,14 @@ export interface UploadedScreenshot {
   browser: string;
   url: string;
 }
+
+export interface ScreenshotError {
+  name: string;
+  browser: string;
+  error: string;
+}
+
+export interface CaptureResult {
+  successful: CapturedScreenshot[];
+  failed: ScreenshotError[];
+}
