@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "description": "GitHub Action to automatically capture and post screenshots to PRs",
   "main": "dist/index.js",
-  "packageManager": "pnpm@10.15.0",
+  "packageManager": "pnpm@10.18.1",
   "scripts": {
     "build": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
     "test": "jest",
@@ -29,7 +29,7 @@
     "@actions/github": "^6.0.0",
     "@actions/tool-cache": "^2.0.2",
     "debug": "^4.3.6",
-    "playwright": "latest",
+    "playwright": "^1.56.0",
     "yaml": "^2.5.0"
   },
   "devDependencies": {

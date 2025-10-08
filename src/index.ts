@@ -72,11 +72,11 @@ export async function run(): Promise<void> {
       logger.info('🎭 Installing Playwright browsers...');
       try {
         const browsersToInstall = browsers || 'chromium';
-        // First, install playwright globally to ensure CLI is available
-        await exec.exec('npm', ['install', '-g', 'playwright']);
-
-        // Then install the browsers
-        await exec.exec('playwright', [
+        // Use npx with explicit version to ensure consistency
+        // The -y flag auto-confirms installation
+        await exec.exec('npx', [
+          '-y',
+          'playwright@1.56.0',
           'install',
           '--with-deps',
           ...browsersToInstall.split(',').map((b) => b.trim()),
