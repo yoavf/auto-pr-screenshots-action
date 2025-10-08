@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.4.0-beta](https://github.com/yoavf/auto-pr-screenshots-action/compare/v1.3.1-beta...v1.4.0-beta) (2025-10-08)
+
+
+### Features
+
+* correctly display errored screenshots ([fe01899](https://github.com/yoavf/auto-pr-screenshots-action/commit/fe01899a02a45db531e0688a22efe113f4f36e90))
+* correctly display screenshot errors ([ed02266](https://github.com/yoavf/auto-pr-screenshots-action/commit/ed02266f73cda47fb057aca9e8808c839487b92a))
+
+
+### Bug Fixes
+
+* always use self bundled playwright so it doesn't conflict with caller repo version ([a8c150c](https://github.com/yoavf/auto-pr-screenshots-action/commit/a8c150c9556401762a1045f5f43c362d41fe8358))
+* use fixed playwright version to prevent conflicts ([ab94737](https://github.com/yoavf/auto-pr-screenshots-action/commit/ab947379b6fd70badd324fec6d538d10ec8d31bf))
+
 ## [1.3.1-beta](https://github.com/yoavf/auto-pr-screenshots-action/compare/v1.3.0-beta...v1.3.1-beta) (2025-08-24)
 
 
