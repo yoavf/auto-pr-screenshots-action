@@ -20,13 +20,14 @@ type BrowserName = keyof typeof BROWSER_MAP;
 
 interface CaptureOptions {
   browsers?: string;
+  onProgress?: (result: CaptureResult) => void | Promise<void>;
 }
 
 export async function captureScreenshots(
   config: Config,
   options: CaptureOptions = {},
 ): Promise<CaptureResult> {
-  const { browsers = 'chromium' } = options;
+  const { browsers = 'chromium', onProgress } = options;
   const browserList = browsers.split(',').map((b) => b.trim()) as BrowserName[];
 
   captureLogger.info(`Starting screenshot capture with browsers: ${browserList.join(', ')}`);
@@ -55,6 +56,11 @@ export async function captureScreenshots(
           successful.push(result.screenshot);
         } else {
           failed.push(result.error);
+        }
+
+        // Call progress callback after each screenshot
+        if (onProgress) {
+          await onProgress({ successful: [...successful], failed: [...failed] });
         }
       }
     } finally {

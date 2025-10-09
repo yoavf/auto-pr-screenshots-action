@@ -2,13 +2,13 @@ import { promises as fs } from 'node:fs';
 import * as core from '@actions/core';
 import * as exec from '@actions/exec';
 import * as github from '@actions/github';
-import { postComment } from './comment-poster';
+import { postInitialComment, updateComment } from './comment-poster';
 import { loadConfig } from './config-loader';
 import { detectFramework } from './framework-detector';
 import { logger } from './logger';
 import { captureScreenshots } from './screenshot-capture';
 import { uploadScreenshots } from './screenshot-uploader';
-import type { Config } from './types';
+import type { Config, UploadedScreenshot } from './types';
 
 // Track if we need to exit
 let _shouldExit = false;
@@ -96,9 +96,59 @@ export async function run(): Promise<void> {
       logger.warn('⚠️  Not running in a pull request context, some features may be limited');
     }
 
-    // Capture screenshots
+    // Post initial comment
+    let commentId: number | null = null;
+    if (!skipComment && context.eventName === 'pull_request') {
+      commentId = await postInitialComment({
+        token,
+        context,
+        config,
+        showAttribution,
+      });
+    }
+
+    // Track uploaded screenshots to avoid re-uploading
+    const uploadedScreenshots: UploadedScreenshot[] = [];
+    let lastUploadedCount = 0;
+
+    // Capture screenshots with progress updates
     logger.info('📸 Capturing screenshots...');
-    const captureResult = await captureScreenshots(config, { browsers });
+    const captureResult = await captureScreenshots(config, {
+      browsers,
+      onProgress: async (progress) => {
+        // Only upload and update if we have more than one screenshot configured
+        if (config.screenshots.length <= 1) return;
+
+        // Upload any new screenshots
+        const newScreenshots = progress.successful.slice(lastUploadedCount);
+        if (newScreenshots.length > 0) {
+          const newUploaded = await uploadScreenshots(newScreenshots, {
+            branch,
+            token,
+            context,
+          });
+          uploadedScreenshots.push(...newUploaded);
+          lastUploadedCount = progress.successful.length;
+        }
+
+        // Update comment with progress
+        if (commentId && !skipComment) {
+          await updateComment(
+            commentId,
+            uploadedScreenshots,
+            progress.failed,
+            {
+              token,
+              context,
+              config,
+              showAttribution,
+            },
+            'in_progress',
+          );
+        }
+      },
+    });
+
     const screenshots = captureResult.successful;
     const screenshotErrors = captureResult.failed;
 
@@ -115,16 +165,20 @@ export async function run(): Promise<void> {
         process.exit(1);
       } else {
         logger.warn('⚠️  Continuing despite no screenshots (fail-on-error is false)');
-        // Post comment with just errors if we're in a PR context
-        if (!skipComment && context.eventName === 'pull_request') {
-          logger.info('💬 Posting error comment to PR...');
-          await postComment([], screenshotErrors, {
-            token,
-            context,
-            config,
-            showAttribution,
-          });
-          logger.success('✅ Error comment posted');
+        // Update comment with just errors if we're in a PR context
+        if (commentId && !skipComment) {
+          await updateComment(
+            commentId,
+            [],
+            screenshotErrors,
+            {
+              token,
+              context,
+              config,
+              showAttribution,
+            },
+            'complete',
+          );
         }
         return; // Exit early but don't fail
       }
@@ -132,24 +186,36 @@ export async function run(): Promise<void> {
 
     logger.success(`✅ Captured ${screenshots.length} screenshot(s)`);
 
-    // Upload to branch
-    logger.info(`📤 Uploading screenshots to branch: ${branch}`);
-    const uploadedUrls = await uploadScreenshots(screenshots, {
-      branch,
-      token,
-      context,
-    });
-
-    // Post comment to PR
-    if (!skipComment && context.eventName === 'pull_request') {
-      logger.info('💬 Posting comment to PR...');
-      await postComment(uploadedUrls, screenshotErrors, {
+    // Upload any remaining screenshots that weren't uploaded during progress
+    const remainingScreenshots = screenshots.slice(lastUploadedCount);
+    if (remainingScreenshots.length > 0) {
+      logger.info(
+        `📤 Uploading ${remainingScreenshots.length} remaining screenshot(s) to branch: ${branch}`,
+      );
+      const remainingUploaded = await uploadScreenshots(remainingScreenshots, {
+        branch,
         token,
         context,
-        config,
-        showAttribution,
       });
-      logger.success('✅ Comment posted successfully');
+      uploadedScreenshots.push(...remainingUploaded);
+    }
+
+    // Post final comment update
+    if (commentId && !skipComment) {
+      logger.info('💬 Updating comment with final results...');
+      await updateComment(
+        commentId,
+        uploadedScreenshots,
+        screenshotErrors,
+        {
+          token,
+          context,
+          config,
+          showAttribution,
+        },
+        'complete',
+      );
+      logger.success('✅ Comment updated successfully');
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
