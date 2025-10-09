@@ -29,14 +29,39 @@ export async function postInitialComment(options: CommentOptions): Promise<numbe
 
   try {
     const commentBody = generateInitialCommentBody(commitSha);
-    const { data: comment } = await octokit.rest.issues.createComment({
+
+    // Find existing comment
+    const { data: comments } = await octokit.rest.issues.listComments({
       owner,
       repo,
       issue_number: prNumber,
-      body: commentBody,
     });
-    logger.success('✅ Created initial comment');
-    return comment.id;
+
+    const existingComment = comments.find(
+      (comment) => comment.body?.includes(COMMENT_MARKER) && comment.user?.type === 'Bot',
+    );
+
+    if (existingComment) {
+      // Update existing comment
+      await octokit.rest.issues.updateComment({
+        owner,
+        repo,
+        comment_id: existingComment.id,
+        body: commentBody,
+      });
+      logger.success('✅ Updated existing comment with initial status');
+      return existingComment.id;
+    } else {
+      // Create new comment
+      const { data: comment } = await octokit.rest.issues.createComment({
+        owner,
+        repo,
+        issue_number: prNumber,
+        body: commentBody,
+      });
+      logger.success('✅ Created initial comment');
+      return comment.id;
+    }
   } catch (error) {
     logger.error(
       'Failed to post initial comment:',
@@ -89,75 +114,12 @@ export async function updateComment(
   }
 }
 
-export async function postComment(
-  screenshots: UploadedScreenshot[],
-  errors: ScreenshotError[],
-  options: CommentOptions,
-): Promise<void> {
-  const { token, context, config } = options;
-
-  // Only post comments on pull requests
-  if (context.eventName !== 'pull_request' || !context.payload.pull_request) {
-    logger.warn('Not in a pull request context, skipping comment');
-    return;
-  }
-
-  const octokit = github.getOctokit(token);
-  const { owner, repo } = context.repo;
-  const prNumber = context.payload.pull_request.number;
-
-  logger.info(`💬 Posting comment to PR #${prNumber}`);
-
-  try {
-    // Find existing comment
-    const { data: comments } = await octokit.rest.issues.listComments({
-      owner,
-      repo,
-      issue_number: prNumber,
-    });
-
-    const existingComment = comments.find(
-      (comment) => comment.body?.includes(COMMENT_MARKER) && comment.user?.type === 'Bot',
-    );
-
-    // Generate comment body
-    const commentBody = generateCommentBody(
-      screenshots,
-      errors,
-      context,
-      config,
-      options.showAttribution,
-    );
-
-    if (existingComment) {
-      // Update existing comment
-      await octokit.rest.issues.updateComment({
-        owner,
-        repo,
-        comment_id: existingComment.id,
-        body: commentBody,
-      });
-      logger.success('✅ Updated existing comment');
-    } else {
-      // Create new comment
-      await octokit.rest.issues.createComment({
-        owner,
-        repo,
-        issue_number: prNumber,
-        body: commentBody,
-      });
-      logger.success('✅ Created new comment');
-    }
-  } catch (error) {
-    logger.error('Failed to post comment:', error instanceof Error ? error.message : String(error));
-    throw error;
-  }
-}
-
 function generateInitialCommentBody(commitSha: string): string {
+  const timestamp = new Date().toISOString();
   let body = `${COMMENT_MARKER}\n`;
   body += '## 📸 Auto PR Screenshots\n\n';
   body += `🔄 Screenshot capture has started for commit \`${commitSha}\`\n\n`;
+  body += `*Started <relative-time datetime="${timestamp}">${timestamp}</relative-time>*\n\n`;
   body += '*Capturing screenshots...*';
   return body;
 }
@@ -179,9 +141,10 @@ function generateCommentBody(
 
   if (status === 'in_progress') {
     body += `🔄 Screenshot capture in progress for commit \`${commitSha}\`\n\n`;
+    body += `*Last updated <relative-time datetime="${timestamp}">${timestamp}</relative-time>*\n\n`;
   } else {
     body += `✅ Screenshot capture complete for commit \`${commitSha}\`\n\n`;
-    body += `*Completed: ${timestamp}*\n\n`;
+    body += `*Completed <relative-time datetime="${timestamp}">${timestamp}</relative-time>*\n\n`;
   }
 
   if (screenshots.length === 0 && errors.length === 0) {
