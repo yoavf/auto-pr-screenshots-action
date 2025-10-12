@@ -12,6 +12,7 @@ Perfect for visual regression testing, UI/UX reviews, and keeping tabs of AI gen
 - 🗂️ **Organized storage** in a dedicated branch
 - 📸 **Multi-viewport** screenshots (desktop & mobile)
 - 🌐 **Multi-browser** support (Chromium, Firefox, WebKit)
+- 🧹 **Auto-cleanup** - automatically removes screenshots when PRs are closed
 
 ## Quick Start
 
@@ -21,7 +22,7 @@ Perfect for visual regression testing, UI/UX reviews, and keeping tabs of AI gen
 name: Screenshots
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, closed]
 
 jobs:
   screenshots:
@@ -29,28 +30,30 @@ jobs:
     permissions:
       contents: write      # Required for pushing screenshots
       pull-requests: write # Required for posting comments
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      
+
       # Start your app (example)
       - run: npm install
       - run: npm run dev &
-      
+
       # Wait for your app to be ready
       - run: npx wait-on http://localhost:3000
-      
+
       - name: Take screenshots
         uses: yoavf/auto-pr-screenshots@v1
         with:
           url: http://localhost:3000
           github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+> **Note:** Including `closed` in the `types` array enables automatic cleanup of screenshots when a PR is closed or merged. If you omit the `types` array entirely, it will work for all PR events including cleanup.
 
 ## Required Permissions
 
@@ -123,6 +126,7 @@ The action needs either a `url`, a `config-file`, or will fall back to framework
 | `branch` | Branch for storing screenshots | `gh-screenshots` | No |
 | `working-directory` | Working directory to run the action in | `.` | No |
 | `show-attribution` | Show attribution link in PR comments | `false` | No |
+| `cleanup-on-close` | Automatically cleanup screenshots when PR is closed | `true` | No |
 
 *\* At least one of `url`, `config-file`, or auto-detection must work for the action to run.*
 
@@ -227,6 +231,48 @@ If no URL or config is provided, the action will attempt to detect and use commo
 - SvelteKit
 - Gatsby
 - Nuxt
+
+## Auto-Cleanup on PR Close
+
+By default, when a PR is closed or merged, this action will automatically clean up all screenshots associated with that PR from the screenshots branch. This helps keep your repository clean and reduces storage usage.
+
+### Enabling Auto-Cleanup
+
+To enable auto-cleanup, add `closed` to the workflow trigger types:
+
+```yaml
+on:
+  pull_request:
+    types: [opened, synchronize, closed]
+```
+
+Alternatively, omit the `types` array entirely to trigger on all PR events:
+
+```yaml
+on:
+  pull_request:
+```
+
+### Disabling Auto-Cleanup
+
+If you want to preserve screenshots after a PR is closed, you can disable auto-cleanup:
+
+```yaml
+- name: Take screenshots
+  uses: yoavf/auto-pr-screenshots@v1
+  with:
+    url: http://localhost:3000
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    cleanup-on-close: false
+```
+
+### How It Works
+
+When a PR is closed:
+1. The action detects the `closed` event
+2. It finds all files in the screenshots branch under `pr-{number}/`
+3. All screenshots for that PR are removed from the branch
+4. The cleanup process takes only a few seconds and doesn't require starting your app
 
 ## Troubleshooting
 

@@ -7,6 +7,7 @@ import { loadConfig } from './config-loader';
 import { detectFramework } from './framework-detector';
 import { logger } from './logger';
 import { captureScreenshots } from './screenshot-capture';
+import { cleanupScreenshots } from './screenshot-cleanup';
 import { uploadScreenshots } from './screenshot-uploader';
 import type { Config } from './types';
 
@@ -41,11 +42,29 @@ export async function run(): Promise<void> {
     const token = core.getInput('github-token');
     const workingDirectory = core.getInput('working-directory');
     const showAttribution = core.getInput('show-attribution') === 'true';
+    const cleanupOnClose = core.getInput('cleanup-on-close') === 'true';
 
     // Change to working directory if specified
     if (workingDirectory && workingDirectory !== '.') {
       process.chdir(workingDirectory);
       logger.info(`📁 Changed working directory to: ${workingDirectory}`);
+    }
+
+    // Check if this is a PR close event and cleanup is enabled
+    const context = github.context;
+    const isCloseEvent =
+      context.payload.action === 'closed' && context.eventName === 'pull_request';
+
+    if (isCloseEvent && cleanupOnClose) {
+      logger.info('🧹 PR closed event detected, running cleanup...');
+      await cleanupScreenshots({
+        branch,
+        token,
+        context,
+      });
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+      logger.success(`🎉 Screenshot cleanup completed in ${duration}s`);
+      return;
     }
 
     // Log configuration
@@ -91,7 +110,6 @@ export async function run(): Promise<void> {
     }
 
     // Validate we're in a PR context
-    const context = github.context;
     if (context.eventName !== 'pull_request' && !process.env.LOCAL_TEST) {
       logger.warn('⚠️  Not running in a pull request context, some features may be limited');
     }
