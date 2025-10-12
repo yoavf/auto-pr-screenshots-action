@@ -45,11 +45,6 @@ export async function cleanupScreenshots(options: CleanupOptions): Promise<void>
       throw error;
     }
 
-    if (!branchExists) {
-      logger.info('No screenshots branch found, nothing to clean up');
-      return;
-    }
-
     const currentSha = branchRef.data.object.sha;
 
     // Get the current tree
