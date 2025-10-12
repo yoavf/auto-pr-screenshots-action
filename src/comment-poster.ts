@@ -131,7 +131,7 @@ function generateCommentBody(
   config: Config,
   showAttribution: boolean = false,
   status: 'in_progress' | 'complete' = 'complete',
-  commitSha?: string,
+  commitSha: string,
 ): string {
   const timestamp = new Date().toISOString();
   const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
