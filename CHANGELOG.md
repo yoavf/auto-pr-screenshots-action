@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.0-beta](https://github.com/yoavf/auto-pr-screenshots-action/compare/v1.4.0-beta...v1.5.0-beta) (2025-10-12)
+
+
+### Features
+
+* progressive comment updates ([74e4d55](https://github.com/yoavf/auto-pr-screenshots-action/commit/74e4d55a87b1fd6bfc3cfbeefeb2831a04f0851c))
+* progressive comment updates ([4003f29](https://github.com/yoavf/auto-pr-screenshots-action/commit/4003f290704d7754a465a30df19467d3c69b1468))
+
+
+### Bug Fixes
+
+* just use relative time ([af0716c](https://github.com/yoavf/auto-pr-screenshots-action/commit/af0716c5e9a0ea6358b882df07d540fc3a823c2f))
+
 ## [1.4.0-beta](https://github.com/yoavf/auto-pr-screenshots-action/compare/v1.3.1-beta...v1.4.0-beta) (2025-10-08)
 
 
