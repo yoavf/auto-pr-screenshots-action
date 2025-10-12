@@ -89300,22 +89300,25 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.postComment = postComment;
+exports.postInitialComment = postInitialComment;
+exports.updateComment = updateComment;
 const github = __importStar(__nccwpck_require__(75380));
 const logger_1 = __nccwpck_require__(61661);
 const COMMENT_MARKER = '<!-- auto-pr-screenshots -->';
-async function postComment(screenshots, errors, options) {
-    const { token, context, config } = options;
+async function postInitialComment(options) {
+    const { token, context } = options;
     // Only post comments on pull requests
     if (context.eventName !== 'pull_request' || !context.payload.pull_request) {
         logger_1.commentLogger.warn('Not in a pull request context, skipping comment');
-        return;
+        return null;
     }
     const octokit = github.getOctokit(token);
     const { owner, repo } = context.repo;
     const prNumber = context.payload.pull_request.number;
-    logger_1.commentLogger.info(`💬 Posting comment to PR #${prNumber}`);
+    const commitSha = context.payload.pull_request.head.sha.substring(0, 7);
+    logger_1.commentLogger.info(`💬 Posting initial comment to PR #${prNumber}`);
     try {
+        const commentBody = generateInitialCommentBody(commitSha);
         // Find existing comment
         const { data: comments } = await octokit.rest.issues.listComments({
             owner,
@@ -89323,8 +89326,6 @@ async function postComment(screenshots, errors, options) {
             issue_number: prNumber,
         });
         const existingComment = comments.find((comment) => comment.body?.includes(COMMENT_MARKER) && comment.user?.type === 'Bot');
-        // Generate comment body
-        const commentBody = generateCommentBody(screenshots, errors, context, config, options.showAttribution);
         if (existingComment) {
             // Update existing comment
             await octokit.rest.issues.updateComment({
@@ -89333,30 +89334,70 @@ async function postComment(screenshots, errors, options) {
                 comment_id: existingComment.id,
                 body: commentBody,
             });
-            logger_1.commentLogger.success('✅ Updated existing comment');
+            logger_1.commentLogger.success('✅ Updated existing comment with initial status');
+            return existingComment.id;
         }
         else {
             // Create new comment
-            await octokit.rest.issues.createComment({
+            const { data: comment } = await octokit.rest.issues.createComment({
                 owner,
                 repo,
                 issue_number: prNumber,
                 body: commentBody,
             });
-            logger_1.commentLogger.success('✅ Created new comment');
+            logger_1.commentLogger.success('✅ Created initial comment');
+            return comment.id;
         }
     }
     catch (error) {
-        logger_1.commentLogger.error('Failed to post comment:', error instanceof Error ? error.message : String(error));
-        throw error;
+        logger_1.commentLogger.error('Failed to post initial comment:', error instanceof Error ? error.message : String(error));
+        return null;
     }
 }
-function generateCommentBody(screenshots, errors, context, config, showAttribution = false) {
+async function updateComment(commentId, screenshots, errors, options, status) {
+    const { token, context, config } = options;
+    if (context.eventName !== 'pull_request' || !context.payload.pull_request) {
+        return;
+    }
+    const octokit = github.getOctokit(token);
+    const { owner, repo } = context.repo;
+    const commitSha = context.payload.pull_request.head.sha.substring(0, 7);
+    try {
+        const commentBody = generateCommentBody(screenshots, errors, context, config, options.showAttribution, status, commitSha);
+        await octokit.rest.issues.updateComment({
+            owner,
+            repo,
+            comment_id: commentId,
+            body: commentBody,
+        });
+        logger_1.commentLogger.success(`✅ Updated comment (${status})`);
+    }
+    catch (error) {
+        logger_1.commentLogger.error('Failed to update comment:', error instanceof Error ? error.message : String(error));
+    }
+}
+function generateInitialCommentBody(commitSha) {
+    const timestamp = new Date().toISOString();
+    let body = `${COMMENT_MARKER}\n`;
+    body += '## 📸 Auto PR Screenshots\n\n';
+    body += `🔄 Screenshot capture has started for commit \`${commitSha}\`\n\n`;
+    body += `*Started <relative-time datetime="${timestamp}">${timestamp}</relative-time>*\n\n`;
+    body += '*Capturing screenshots...*';
+    return body;
+}
+function generateCommentBody(screenshots, errors, context, config, showAttribution = false, status = 'complete', commitSha) {
     const timestamp = new Date().toISOString();
     const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
     let body = `${COMMENT_MARKER}\n`;
     body += '## 📸 Auto PR Screenshots\n\n';
-    body += `*Updated: ${timestamp}*\n\n`;
+    if (status === 'in_progress') {
+        body += `🔄 Screenshot capture in progress for commit \`${commitSha}\`\n\n`;
+        body += `*Last updated <relative-time datetime="${timestamp}">${timestamp}</relative-time>*\n\n`;
+    }
+    else {
+        body += `✅ Screenshot capture complete for commit \`${commitSha}\`\n\n`;
+        body += `*Completed <relative-time datetime="${timestamp}">${timestamp}</relative-time>*\n\n`;
+    }
     if (screenshots.length === 0 && errors.length === 0) {
         body += `⚠️ No screenshots were captured. Check the [action logs](${runUrl}) for details.\n`;
         return body;
@@ -90004,9 +90045,49 @@ async function run() {
         if (context.eventName !== 'pull_request' && !process.env.LOCAL_TEST) {
             logger_1.logger.warn('⚠️  Not running in a pull request context, some features may be limited');
         }
-        // Capture screenshots
+        // Post initial comment
+        let commentId = null;
+        if (!skipComment && context.eventName === 'pull_request') {
+            commentId = await (0, comment_poster_1.postInitialComment)({
+                token,
+                context,
+                config,
+                showAttribution,
+            });
+        }
+        // Track uploaded screenshots to avoid re-uploading
+        const uploadedScreenshots = [];
+        let lastUploadedCount = 0;
+        // Capture screenshots with progress updates
         logger_1.logger.info('📸 Capturing screenshots...');
-        const captureResult = await (0, screenshot_capture_1.captureScreenshots)(config, { browsers });
+        const captureResult = await (0, screenshot_capture_1.captureScreenshots)(config, {
+            browsers,
+            onProgress: async (progress) => {
+                // Only upload and update if we have more than one screenshot configured
+                if (config.screenshots.length <= 1)
+                    return;
+                // Upload any new screenshots
+                const newScreenshots = progress.successful.slice(lastUploadedCount);
+                if (newScreenshots.length > 0) {
+                    const newUploaded = await (0, screenshot_uploader_1.uploadScreenshots)(newScreenshots, {
+                        branch,
+                        token,
+                        context,
+                    });
+                    uploadedScreenshots.push(...newUploaded);
+                    lastUploadedCount = progress.successful.length;
+                }
+                // Update comment with progress
+                if (commentId && !skipComment) {
+                    await (0, comment_poster_1.updateComment)(commentId, uploadedScreenshots, progress.failed, {
+                        token,
+                        context,
+                        config,
+                        showAttribution,
+                    }, 'in_progress');
+                }
+            },
+        });
         const screenshots = captureResult.successful;
         const screenshotErrors = captureResult.failed;
         if (screenshotErrors.length > 0) {
@@ -90021,38 +90102,40 @@ async function run() {
             }
             else {
                 logger_1.logger.warn('⚠️  Continuing despite no screenshots (fail-on-error is false)');
-                // Post comment with just errors if we're in a PR context
-                if (!skipComment && context.eventName === 'pull_request') {
-                    logger_1.logger.info('💬 Posting error comment to PR...');
-                    await (0, comment_poster_1.postComment)([], screenshotErrors, {
+                // Update comment with just errors if we're in a PR context
+                if (commentId && !skipComment) {
+                    await (0, comment_poster_1.updateComment)(commentId, [], screenshotErrors, {
                         token,
                         context,
                         config,
                         showAttribution,
-                    });
-                    logger_1.logger.success('✅ Error comment posted');
+                    }, 'complete');
                 }
                 return; // Exit early but don't fail
             }
         }
         logger_1.logger.success(`✅ Captured ${screenshots.length} screenshot(s)`);
-        // Upload to branch
-        logger_1.logger.info(`📤 Uploading screenshots to branch: ${branch}`);
-        const uploadedUrls = await (0, screenshot_uploader_1.uploadScreenshots)(screenshots, {
-            branch,
-            token,
-            context,
-        });
-        // Post comment to PR
-        if (!skipComment && context.eventName === 'pull_request') {
-            logger_1.logger.info('💬 Posting comment to PR...');
-            await (0, comment_poster_1.postComment)(uploadedUrls, screenshotErrors, {
+        // Upload any remaining screenshots that weren't uploaded during progress
+        const remainingScreenshots = screenshots.slice(lastUploadedCount);
+        if (remainingScreenshots.length > 0) {
+            logger_1.logger.info(`📤 Uploading ${remainingScreenshots.length} remaining screenshot(s) to branch: ${branch}`);
+            const remainingUploaded = await (0, screenshot_uploader_1.uploadScreenshots)(remainingScreenshots, {
+                branch,
+                token,
+                context,
+            });
+            uploadedScreenshots.push(...remainingUploaded);
+        }
+        // Post final comment update
+        if (commentId && !skipComment) {
+            logger_1.logger.info('💬 Updating comment with final results...');
+            await (0, comment_poster_1.updateComment)(commentId, uploadedScreenshots, screenshotErrors, {
                 token,
                 context,
                 config,
                 showAttribution,
-            });
-            logger_1.logger.success('✅ Comment posted successfully');
+            }, 'complete');
+            logger_1.logger.success('✅ Comment updated successfully');
         }
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
         logger_1.logger.success(`🎉 Auto PR Screenshots completed in ${duration}s`);
@@ -90384,7 +90467,7 @@ const BROWSER_MAP = {
     webkit: playwright_1.webkit,
 };
 async function captureScreenshots(config, options = {}) {
-    const { browsers = 'chromium' } = options;
+    const { browsers = 'chromium', onProgress } = options;
     const browserList = browsers.split(',').map((b) => b.trim());
     logger_1.captureLogger.info(`Starting screenshot capture with browsers: ${browserList.join(', ')}`);
     const screenshotsDir = path.join(process.cwd(), 'screenshots');
@@ -90408,6 +90491,10 @@ async function captureScreenshots(config, options = {}) {
                 }
                 else {
                     failed.push(result.error);
+                }
+                // Call progress callback after each screenshot
+                if (onProgress) {
+                    await onProgress({ successful: [...successful], failed: [...failed] });
                 }
             }
         }
