@@ -89969,6 +89969,7 @@ const config_loader_1 = __nccwpck_require__(93911);
 const framework_detector_1 = __nccwpck_require__(6740);
 const logger_1 = __nccwpck_require__(61661);
 const screenshot_capture_1 = __nccwpck_require__(80162);
+const screenshot_cleanup_1 = __nccwpck_require__(40860);
 const screenshot_uploader_1 = __nccwpck_require__(83352);
 // Track if we need to exit
 let _shouldExit = false;
@@ -89997,10 +89998,25 @@ async function run() {
         const token = core.getInput('github-token');
         const workingDirectory = core.getInput('working-directory');
         const showAttribution = core.getInput('show-attribution') === 'true';
+        const cleanupOnClose = core.getInput('cleanup-on-close') === 'true';
         // Change to working directory if specified
         if (workingDirectory && workingDirectory !== '.') {
             process.chdir(workingDirectory);
             logger_1.logger.info(`📁 Changed working directory to: ${workingDirectory}`);
+        }
+        // Check if this is a PR close event and cleanup is enabled
+        const context = github.context;
+        const isCloseEvent = context.payload.action === 'closed' && context.eventName === 'pull_request';
+        if (isCloseEvent && cleanupOnClose) {
+            logger_1.logger.info('🧹 PR closed event detected, running cleanup...');
+            await (0, screenshot_cleanup_1.cleanupScreenshots)({
+                branch,
+                token,
+                context,
+            });
+            const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+            logger_1.logger.success(`🎉 Screenshot cleanup completed in ${duration}s`);
+            return;
         }
         // Log configuration
         logger_1.logger.info('📋 Configuration:', {
@@ -90041,7 +90057,6 @@ async function run() {
             }
         }
         // Validate we're in a PR context
-        const context = github.context;
         if (context.eventName !== 'pull_request' && !process.env.LOCAL_TEST) {
             logger_1.logger.warn('⚠️  Not running in a pull request context, some features may be limited');
         }
@@ -90591,6 +90606,144 @@ async function executeSteps(page, steps) {
             logger_1.captureLogger.debug(`Waiting for selector: ${step.waitFor}`);
             await page.waitForSelector(step.waitFor, { state: 'visible', timeout: 10000 });
         }
+    }
+}
+
+
+/***/ }),
+
+/***/ 40860:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.cleanupScreenshots = cleanupScreenshots;
+const github = __importStar(__nccwpck_require__(75380));
+const logger_1 = __nccwpck_require__(61661);
+async function cleanupScreenshots(options) {
+    const { branch, token, context } = options;
+    const octokit = github.getOctokit(token);
+    logger_1.logger.info('🧹 Starting screenshot cleanup...');
+    try {
+        // Get repository info
+        const { owner, repo } = context.repo;
+        const prNumber = context.payload.pull_request?.number;
+        if (!prNumber) {
+            logger_1.logger.warn('⚠️  No PR number found, skipping cleanup');
+            return;
+        }
+        logger_1.logger.info(`Cleaning up screenshots for PR #${prNumber}`);
+        // Check if screenshots branch exists
+        let branchExists = false;
+        let branchRef;
+        try {
+            branchRef = await octokit.rest.git.getRef({
+                owner,
+                repo,
+                ref: `heads/${branch}`,
+            });
+            branchExists = true;
+            logger_1.logger.debug(`Branch ${branch} exists`);
+        }
+        catch (error) {
+            if (error && typeof error === 'object' && 'status' in error && error.status === 404) {
+                logger_1.logger.info(`Branch ${branch} does not exist, nothing to clean up`);
+                return;
+            }
+            throw error;
+        }
+        const currentSha = branchRef.data.object.sha;
+        // Get the current tree
+        const { data: currentCommit } = await octokit.rest.git.getCommit({
+            owner,
+            repo,
+            commit_sha: currentSha,
+        });
+        const { data: currentTree } = await octokit.rest.git.getTree({
+            owner,
+            repo,
+            tree_sha: currentCommit.tree.sha,
+            recursive: 'true',
+        });
+        // Filter out all files under pr-{number}/
+        const prPrefix = `pr-${prNumber}/`;
+        const remainingFiles = currentTree.tree.filter((item) => {
+            const path = item.path || '';
+            return !path.startsWith(prPrefix);
+        });
+        // Check if there are any files to delete
+        const deletedCount = currentTree.tree.length - remainingFiles.length;
+        if (deletedCount === 0) {
+            logger_1.logger.info(`No screenshots found for PR #${prNumber}, nothing to clean up`);
+            return;
+        }
+        logger_1.logger.info(`Found ${deletedCount} file(s) to delete for PR #${prNumber}`);
+        // Create new tree without the PR's screenshots
+        const { data: newTree } = await octokit.rest.git.createTree({
+            owner,
+            repo,
+            tree: remainingFiles.map((item) => ({
+                path: item.path,
+                mode: item.mode,
+                type: item.type,
+                sha: item.sha,
+            })),
+        });
+        // Create commit
+        const { data: newCommit } = await octokit.rest.git.createCommit({
+            owner,
+            repo,
+            message: `🧹 Cleanup screenshots for PR #${prNumber}`,
+            tree: newTree.sha,
+            parents: [currentSha],
+        });
+        // Update branch reference
+        await octokit.rest.git.updateRef({
+            owner,
+            repo,
+            ref: `heads/${branch}`,
+            sha: newCommit.sha,
+        });
+        logger_1.logger.success(`✅ Successfully cleaned up screenshots for PR #${prNumber}`);
+        logger_1.logger.info(`Deleted ${deletedCount} file(s) from ${branch} branch`);
+    }
+    catch (error) {
+        logger_1.logger.error('Failed to cleanup screenshots:', error instanceof Error ? error.message : String(error));
+        throw error;
     }
 }
 
